@@ -1,0 +1,2 @@
+# Release artifacts must be byte-identical across Windows and Linux checkouts.
+/dist/** -text
