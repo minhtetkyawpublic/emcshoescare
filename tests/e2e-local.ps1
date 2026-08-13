@@ -92,15 +92,15 @@ try {
   $multipart = @('-sS', '-b', $cookieHeader, '-H', "X-CSRF-Token: $customerCsrf",
     '-F', "clientRequestId=$requestId", '-F', 'fullName=Release Test Customer',
     '-F', 'address=Yangon release test address', '-F', "packageId=$($package.id)",
-    '-F', 'handover=pickup', '-F', 'notes=Full release workflow test',
-    '-F', "photos[]=@$PhotoPath;type=image/png")
+    '-F', 'handover=pickup', '-F', 'notes=Full release workflow test')
+  1..10 | ForEach-Object { $multipart += @('-F', "photos[]=@$PhotoPath;type=image/png") }
   $firstRaw = & curl.exe @multipart "$BaseUrl/orders"
   $firstOrder = $firstRaw | ConvertFrom-Json
   Assert-True $firstOrder.success "Order creation succeeds: $firstRaw"
   $orderId = [int]$firstOrder.data.order.id
   $customerCsrf = $firstOrder.data.csrfToken
   Assert-True ([int]$firstOrder.data.order.pickupFeeKs -eq $testPickupFee) 'Pickup fee is included only in the pickup order.'
-  Assert-True ([int]$firstOrder.data.order.photoCount -eq 1) 'Order stores the photo.'
+  Assert-True ([int]$firstOrder.data.order.photoCount -eq 10) 'Order stores the maximum of ten photos.'
 
   $multipart[4] = "X-CSRF-Token: $customerCsrf"
   $replayRaw = & curl.exe @multipart "$BaseUrl/orders"
@@ -122,10 +122,11 @@ try {
   Assert-True ([int]$dropoffOrder.data.order.pickupFeeKs -eq 0) 'Drop-off order does not include the optional pickup fee.'
 
   $adminOrder = Invoke-JsonApi 'GET' "/admin/orders/$orderId" $adminSession
-  Assert-True ([int]$adminOrder.data.order.photoCount -eq 1) 'Admin can view order photo metadata.'
+  Assert-True ([int]$adminOrder.data.order.photoCount -eq 10) 'Admin can view all ten order photos.'
   $photoId = [int]$adminOrder.data.order.photos[0].id
   $adminPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $adminSession -UseBasicParsing
   Assert-True ($adminPhoto.StatusCode -eq 200 -and $adminPhoto.Headers['Content-Type'] -eq 'image/png') 'Admin can retrieve the private photo.'
+  Assert-True ($adminPhoto.Headers['Cache-Control'] -match 'no-store') 'Private photo responses cannot be stored in browser caches.'
 
   foreach ($status in @('confirmed', 'pickup_scheduled', 'rider_on_way', 'shoes_received', 'repairing', 'ready', 'done')) {
     $statusResult = Invoke-JsonApi 'PUT' "/admin/orders/$orderId/status" $adminSession @{
@@ -153,6 +154,7 @@ try {
   Assert-True ($dropoffDetail.data.order.history.Count -eq 6) 'Drop-off timeline skips pickup and rider states.'
   $customerPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $customerSession -UseBasicParsing
   Assert-True ($customerPhoto.StatusCode -eq 200) 'Owning customer can retrieve the private photo.'
+  Assert-True ($customerPhoto.Headers['Cache-Control'] -match 'no-store') 'Owning-customer photo responses remain non-cacheable.'
 
   $otherSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $otherPhone = '098' + (Get-Random -Minimum 1000000 -Maximum 9999999)
@@ -160,6 +162,13 @@ try {
     phone = $otherPhone; password = 'ReleaseTestPassword9'; fullName = 'Other Test Customer'; address = ''; remember = $false
   }
   $otherCustomerId = [int]$otherRegistration.data.customer.id
+  $orderAccessRejected = $false
+  try {
+    Invoke-JsonApi 'GET' "/orders/$orderId" $otherSession | Out-Null
+  } catch {
+    $orderAccessRejected = ([int]$_.Exception.Response.StatusCode -eq 404)
+  }
+  Assert-True $orderAccessRejected 'A different customer cannot retrieve the order.'
   $accessRejected = $false
   try {
     Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $otherSession -UseBasicParsing -ErrorAction Stop | Out-Null
@@ -183,7 +192,7 @@ try {
   Invoke-JsonApi 'POST' '/auth/logout' $customerSession $null $customerCsrf | Out-Null
   Invoke-JsonApi 'POST' '/admin/auth/logout' $adminSession $null $adminCsrf | Out-Null
 
-  Write-Output "PASS customer=$customerId pickupOrder=$orderId dropoffOrder=$dropoffOrderId package=$testPackageId pickupHistory=8 dropoffHistory=6 privatePhoto=protected duplicateCount=1"
+  Write-Output "PASS customer=$customerId pickupOrder=$orderId dropoffOrder=$dropoffOrderId package=$testPackageId pickupPhotos=10 pickupHistory=8 dropoffHistory=6 crossAccount=protected privatePhoto=no-store duplicateCount=1"
 }
 finally {
   if ($adminSession -and $adminCsrf) {
@@ -196,11 +205,13 @@ finally {
     }
     $cleanupOrderIds = @($orderId, $dropoffOrderId) | Where-Object { $_ -gt 0 }
     foreach ($cleanupOrderId in $cleanupOrderIds) {
-      $photoRow = & $mysql -u root -N -B -D emc_shoes_care -e "SELECT o.storage_key,p.storage_name FROM orders o LEFT JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId LIMIT 1;"
-      if ($photoRow) {
-        $parts = $photoRow -split "`t"
-        if ($parts.Count -eq 2 -and $parts[0] -match '^[a-f0-9]{32}$' -and $parts[1] -match '^[a-f0-9]{32}\.(jpg|png|webp)$') {
-          $storageRecords += [pscustomobject]@{ StorageKey = $parts[0]; StorageName = $parts[1] }
+      $photoRows = & $mysql -u root -N -B -D emc_shoes_care -e "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;"
+      foreach ($photoRow in @($photoRows)) {
+        if ($photoRow) {
+          $parts = $photoRow -split "`t"
+          if ($parts.Count -eq 2 -and $parts[0] -match '^[a-f0-9]{32}$' -and $parts[1] -match '^[a-f0-9]{32}\.(jpg|png|webp)$') {
+            $storageRecords += [pscustomobject]@{ StorageKey = $parts[0]; StorageName = $parts[1] }
+          }
         }
       }
       & $mysql -u root -D emc_shoes_care -e "DELETE FROM orders WHERE id=$cleanupOrderId;"

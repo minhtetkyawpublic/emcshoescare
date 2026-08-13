@@ -218,7 +218,8 @@ function sendOrderPhoto(PDO $pdo, array $config, int $orderId, int $photoId): ne
     header('Content-Type: ' . $photo['mime_type']);
     header('Content-Length: ' . filesize($path));
     header('Content-Disposition: inline; filename="emc-order-photo.' . pathinfo($photo['storage_name'], PATHINFO_EXTENSION) . '"');
-    header('Cache-Control: private, max-age=300');
+    header('Cache-Control: no-store, private');
+    header('Pragma: no-cache');
     readfile($path);
     exit;
 }

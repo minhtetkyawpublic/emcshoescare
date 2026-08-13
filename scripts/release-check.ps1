@@ -40,6 +40,10 @@ try {
   if (-not $worker.Contains('requestUrl.pathname.includes("/api/")') -or -not $worker.Contains('event.request.method !== "GET"')) {
     throw 'Service worker no longer excludes private API or mutation traffic.'
   }
+  $orderLibrary = Get-Content api\lib\Orders.php -Raw
+  if (-not $orderLibrary.Contains("header('Cache-Control: no-store, private')")) {
+    throw 'Authenticated order photos must not be stored in browser caches.'
+  }
   foreach ($required in @('RELEASE_CHECKLIST.md', 'docs\CONTENT_WORKSHEET.md', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md', 'docs\HANDOVER.md', 'database\migrations\004_add_order_idempotency.sql')) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Required release file is missing: $required" }
   }
