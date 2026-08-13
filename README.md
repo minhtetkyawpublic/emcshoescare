@@ -1,5 +1,7 @@
 # EMC Shoes Care Myanmar
 
+[![Quality checks](https://github.com/minhtetkyawpublic/emcshoescare/actions/workflows/quality.yml/badge.svg)](https://github.com/minhtetkyawpublic/emcshoescare/actions/workflows/quality.yml)
+
 Mobile-first React Progressive Web App for EMC Shoes Care Myanmar. The planned production stack is React, plain PHP, and MySQL.
 
 Phase 1 contains the bilingual public landing page. Phase 2 adds phone/password customer accounts. Phase 3 adds the admin dashboard, database-managed packages, optional pickup fees, real orders, private photo storage, and customer order history. Phase 4 adds guarded status transitions, bilingual admin notes, customer timelines, and unread in-app updates. Phase 5 completes the installable PWA experience, safe offline fallback, recoverable uploads, and production hardening. The backend remains plain PHP and MySQL. See [ROADMAP.md](./ROADMAP.md) for the full delivery plan.
