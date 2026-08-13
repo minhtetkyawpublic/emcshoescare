@@ -44,6 +44,12 @@ try {
   if (-not $orderLibrary.Contains("header('Cache-Control: no-store, private')")) {
     throw 'Authenticated order photos must not be stored in browser caches.'
   }
+  Get-ChildItem database\migrations -Filter '*.sql' | ForEach-Object {
+    $migrationSql = Get-Content $_.FullName -Raw
+    if ($migrationSql -match '(?i)ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS') {
+      throw "Migration uses MariaDB-only ADD COLUMN syntax instead of the MySQL-compatible conditional pattern: $($_.Name)"
+    }
+  }
   foreach ($required in @('RELEASE_CHECKLIST.md', 'docs\CONTENT_WORKSHEET.md', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md', 'docs\HANDOVER.md', 'database\migrations\004_add_order_idempotency.sql')) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Required release file is missing: $required" }
   }

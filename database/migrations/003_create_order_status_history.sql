@@ -1,7 +1,17 @@
 USE emc_shoes_care;
 
-ALTER TABLE orders
-  ADD COLUMN IF NOT EXISTS customer_seen_at DATETIME(6) NULL AFTER status;
+SET @has_customer_seen_at = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'customer_seen_at'
+);
+SET @add_customer_seen_at = IF(
+  @has_customer_seen_at = 0,
+  'ALTER TABLE orders ADD COLUMN customer_seen_at DATETIME(6) NULL AFTER status',
+  'SELECT 1'
+);
+PREPARE add_customer_seen_at_statement FROM @add_customer_seen_at;
+EXECUTE add_customer_seen_at_statement;
+DEALLOCATE PREPARE add_customer_seen_at_statement;
 
 CREATE TABLE IF NOT EXISTS order_status_history (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
