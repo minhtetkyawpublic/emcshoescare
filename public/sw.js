@@ -1,4 +1,4 @@
-const CACHE_NAME = "emc-phase-1-v1";
+const CACHE_NAME = "emc-app-shell-v3";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./emcicon.jpg"];
 
 self.addEventListener("install", (event) => {
@@ -15,6 +15,14 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const requestUrl = new URL(event.request.url);
+
+  // Account, order, admin, and private-photo responses must never enter Cache Storage.
+  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.includes("/api/")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {

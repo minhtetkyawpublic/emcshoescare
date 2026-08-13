@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const EMC_API_VERSION = '2.0.0';
+const EMC_API_VERSION = '3.0.0';
 
 $config = require __DIR__ . '/config.php';
 
@@ -14,6 +14,8 @@ require_once __DIR__ . '/lib/Http.php';
 require_once __DIR__ . '/lib/Database.php';
 require_once __DIR__ . '/lib/Security.php';
 require_once __DIR__ . '/lib/Auth.php';
+require_once __DIR__ . '/lib/AdminAuth.php';
+require_once __DIR__ . '/lib/Orders.php';
 
 configureHttp($config);
 

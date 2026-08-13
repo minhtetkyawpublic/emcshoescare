@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, X } from "lucide-react";
-import { accountApi } from "../api/client";
+import { ArrowRight, CalendarDays, Check, ChevronRight, Eye, EyeOff, Image, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, X } from "lucide-react";
+import { accountApi, apiUrl } from "../api/client";
 
 function translatedError(error, t) {
   const messages = {
@@ -18,6 +18,10 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(Boolean(customer));
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [ordersError, setOrdersError] = useState("");
   const modalRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +37,16 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   useEffect(() => {
     modalRef.current?.querySelector("[data-initial-focus]")?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (!customer) return;
+    let active = true;
+    accountApi.orders()
+      .then((data) => { if (active) setOrders(data.orders || []); })
+      .catch(() => { if (active) setOrdersError(t.ordersLoadError); })
+      .finally(() => { if (active) setOrdersLoading(false); });
+    return () => { active = false; };
+  }, [customer, t.ordersLoadError]);
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -101,6 +115,24 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
     }
   };
 
+  const openOrder = async (orderId) => {
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder(null);
+      return;
+    }
+    setOrdersError("");
+    try {
+      const data = await accountApi.order(orderId);
+      setSelectedOrder(data.order);
+    } catch {
+      setOrdersError(t.ordersLoadError);
+    }
+  };
+
+  const isMyanmar = t.languageName === "English";
+  const orderPrice = (value) => new Intl.NumberFormat(isMyanmar ? "my-MM" : "en-US").format(value);
+  const orderDate = (value) => new Intl.DateTimeFormat(isMyanmar ? "my-MM" : "en-GB", { dateStyle: "medium" }).format(new Date(value));
+
   const closeFromBackdrop = (event) => {
     if (event.target === event.currentTarget && !busy) onClose();
   };
@@ -126,6 +158,35 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
               {success && <p className="account-success" role="status"><Check size={16} />{success}</p>}
               <button className="primary-button account-submit" disabled={busy}>{busy ? t.savingProfile : t.saveProfile}<ArrowRight size={17} /></button>
             </form>
+            <div className="account-divider" />
+            <section className="account-orders" aria-labelledby="my-orders-heading">
+              <div className="account-orders-heading"><div><span>{t.orderHistory}</span><h3 id="my-orders-heading">{t.myOrders}</h3></div><span>{orders.length}</span></div>
+              {ordersLoading && <p className="orders-empty">{t.loadingOrders}</p>}
+              {!ordersLoading && orders.length === 0 && <p className="orders-empty">{t.noOrdersYet}</p>}
+              {ordersError && <p className="account-error" role="alert">{ordersError}</p>}
+              <div className="customer-order-list">
+                {orders.map((order) => (
+                  <div className={selectedOrder?.id === order.id ? "customer-order active" : "customer-order"} key={order.id}>
+                    <button type="button" onClick={() => openOrder(order.id)}>
+                      <span className="order-list-icon"><CalendarDays /></span>
+                      <span><strong>{order.orderNumber}</strong><small>{isMyanmar ? order.package.nameMm : order.package.nameEn} · {orderDate(order.createdAt)}</small></span>
+                      <span className="order-list-end"><em>{t.statusSubmitted}</em><ChevronRight /></span>
+                    </button>
+                    {selectedOrder?.id === order.id && (
+                      <div className="customer-order-detail">
+                        <div className="order-price-row"><span>{t.orderTotal}</span><strong>{orderPrice(selectedOrder.totalPriceKs)} {t.ks}</strong></div>
+                        <div className="order-detail-grid"><span><small>{t.handoverLabel}</small><strong>{selectedOrder.handover === "pickup" ? t.pickup : t.dropoff}</strong></span><span><small>{t.photosSection}</small><strong>{selectedOrder.photoCount}</strong></span></div>
+                        {selectedOrder.notes && <p><strong>{t.notes}:</strong> {selectedOrder.notes}</p>}
+                        <div className="order-photo-strip">
+                          {selectedOrder.photos.map((photo, index) => <img key={photo.id} src={apiUrl(photo.url)} alt={`${t.photosSection} ${index + 1}`} />)}
+                          {selectedOrder.photos.length === 0 && <span><Image />{t.noPhotos}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
             <div className="account-divider" />
             <button className="logout-button" type="button" onClick={logout} disabled={busy}><LogOut size={17} />{busy ? t.loggingOut : t.logout}</button>
           </>

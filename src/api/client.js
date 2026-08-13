@@ -9,13 +9,21 @@ class ApiError extends Error {
 }
 
 let csrfToken = "";
+const API_BASE = import.meta.env.DEV
+  ? "/api"
+  : new URL(/* @vite-ignore */ "../api", import.meta.url).pathname.replace(/\/$/, "");
+
+export function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
 
 async function request(path, options = {}) {
-  const response = await fetch(`./api${path}`, {
+  const isFormData = options.body instanceof FormData;
+  const response = await fetch(apiUrl(path), {
     ...options,
     credentials: "include",
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(csrfToken && options.method && options.method !== "GET" ? { "X-CSRF-Token": csrfToken } : {}),
       ...options.headers,
     },
@@ -52,6 +60,21 @@ export const accountApi = {
   },
   updateProfile(details) {
     return request("/profile", { method: "PUT", body: JSON.stringify(details) });
+  },
+  packages() {
+    return request("/packages");
+  },
+  settings() {
+    return request("/settings");
+  },
+  createOrder(formData) {
+    return request("/orders", { method: "POST", body: formData });
+  },
+  orders() {
+    return request("/orders");
+  },
+  order(orderId) {
+    return request(`/orders/${orderId}`);
   },
   async logout() {
     const data = await request("/auth/logout", { method: "POST" });

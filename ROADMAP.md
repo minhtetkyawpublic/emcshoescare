@@ -47,6 +47,8 @@ Acceptance: a customer can register, remain signed in, log out, and log back in 
 
 ## Phase 3 — Admin packages and order intake
 
+Status: **Implemented locally — pending customer/admin UI review**
+
 - Single-admin secure login
 - Admin dashboard and package CRUD (name, bilingual description, fixed price, active/inactive state)
 - Persist customer orders in MySQL

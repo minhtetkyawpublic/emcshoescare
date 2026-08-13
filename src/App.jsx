@@ -25,6 +25,23 @@ import AccountModal from "./components/AccountModal";
 
 const MAX_PHOTOS = 10;
 
+const fallbackPackages = packageDefinitions.map((pkg, index) => ({
+  ...pkg,
+  id: index + 1,
+  priceKs: pkg.price,
+  nameEn: translations.en[pkg.nameKey],
+  nameMm: translations.mm[pkg.nameKey],
+  descriptionEn: translations.en[pkg.descKey],
+  descriptionMm: translations.mm[pkg.descKey],
+}));
+
+function localizedPackage(packageItem, language) {
+  return {
+    name: language === "mm" ? packageItem.nameMm : packageItem.nameEn,
+    description: language === "mm" ? packageItem.descriptionMm : packageItem.descriptionEn,
+  };
+}
+
 function formatPrice(value, language) {
   return new Intl.NumberFormat(language === "mm" ? "my-MM" : "en-US").format(value);
 }
@@ -73,15 +90,20 @@ function Logo({ compact = false }) {
 function App() {
   const [language, setLanguage] = useState(() => localStorage.getItem("emc-language") || "en");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState("premium");
+  const [packages, setPackages] = useState(fallbackPackages);
+  const [selectedPackage, setSelectedPackage] = useState(String(fallbackPackages[1]?.id || ""));
+  const [pickupFee, setPickupFee] = useState(0);
   const [handover, setHandover] = useState("dropoff");
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
   const [formError, setFormError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [accountMode, setAccountMode] = useState(null);
+  const [orderContact, setOrderContact] = useState({ name: "", phone: "", address: "" });
   const fileInput = useRef(null);
   const t = translations[language];
 
@@ -101,9 +123,29 @@ function App() {
 
   useEffect(() => {
     let active = true;
+    Promise.all([accountApi.packages(), accountApi.settings()])
+      .then(([packageData, settingsData]) => {
+        if (!active) return;
+        if (Array.isArray(packageData.packages)) {
+          setPackages(packageData.packages);
+          setSelectedPackage((current) => packageData.packages.some((pkg) => String(pkg.id) === String(current))
+            ? String(current)
+            : packageData.packages.length ? String(packageData.packages[Math.min(1, packageData.packages.length - 1)].id) : "");
+        }
+        setPickupFee(settingsData.pickupFeeKs || 0);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     accountApi.session()
       .then((data) => {
-        if (active && data.authenticated) setCustomer(data.customer);
+        if (active && data.authenticated) {
+          setCustomer(data.customer);
+          setOrderContact({ name: data.customer.fullName, phone: data.customer.phone, address: data.customer.address || "" });
+        }
       })
       .catch(() => {});
     return () => { active = false; };
@@ -163,17 +205,55 @@ function App() {
     });
   };
 
-  const submitOrder = (event) => {
+  const submitOrder = async (event) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    if (!data.get("name") || !data.get("phone") || !data.get("address") || !selectedPackage || photos.length === 0) {
+    if (!customer) {
+      setFormError(t.signInToOrder);
+      setAccountMode("login");
+      return;
+    }
+    if (!orderContact.name || !orderContact.phone || !orderContact.address || !selectedPackage || photos.length === 0) {
       setFormError(t.requiredError);
       return;
     }
     setFormError("");
-    setSubmitted(true);
-    setTimeout(() => document.getElementById("order-result")?.focus(), 0);
+    setSubmitting(true);
+    const payload = new FormData();
+    payload.append("fullName", orderContact.name);
+    payload.append("address", orderContact.address);
+    payload.append("packageId", selectedPackage);
+    payload.append("handover", handover);
+    payload.append("notes", String(new FormData(event.currentTarget).get("notes") || ""));
+    photos.forEach((photo) => payload.append("photos[]", photo.file, photo.file.name));
+    try {
+      const data = await accountApi.createOrder(payload);
+      setCustomer(data.customer);
+      setOrderContact({ name: data.customer.fullName, phone: data.customer.phone, address: data.customer.address || "" });
+      setSubmittedOrder(data.order);
+      setSubmitted(true);
+      photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+      setPhotos([]);
+      setTimeout(() => document.getElementById("order-result")?.focus(), 0);
+    } catch (error) {
+      const messages = {
+        authentication_required: t.signInToOrder,
+        package_unavailable: t.packageUnavailable,
+        photo_count_invalid: t.photoLimitError,
+        photo_size_invalid: t.photoSizeError,
+        photo_type_invalid: t.photoTypeError,
+      };
+      setFormError(messages[error?.code] || t.orderSubmitError);
+      if (error?.status === 401) {
+        setCustomer(null);
+        setAccountMode("login");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const heroPackage = packages[Math.min(1, packages.length - 1)];
+  const heroPackageCopy = heroPackage ? localizedPackage(heroPackage, language) : null;
 
   return (
     <div className={language === "mm" ? "app myanmar" : "app"}>
@@ -224,8 +304,8 @@ function App() {
               <div className="care-card main-card">
                 <span className="card-kicker">EMC CARE / 01</span>
                 <div className="shoe-mark"><Sparkles size={52} strokeWidth={1.3} /></div>
-                <strong>{t.packageCareName}</strong>
-                <span>{formatPrice(25000, language)} {t.ks}</span>
+                <strong>{heroPackageCopy?.name || t.servicesTitle}</strong>
+                {heroPackage && <span>{formatPrice(heroPackage.priceKs, language)} {t.ks}</span>}
                 <div className="mini-progress"><i /><i /><i /></div>
               </div>
               <div className="floating-card pickup-card"><Truck size={22} /><span>{t.trustThreeTitle}</span></div>
@@ -272,19 +352,24 @@ function App() {
               <p>{t.packagesBody}</p>
             </div>
             <div className="packages-grid">
-              {packageDefinitions.map((pkg) => (
-                <article className={`package-card ${pkg.popular ? "featured" : ""} ${selectedPackage === pkg.id ? "active" : ""}`} key={pkg.id}>
-                  {pkg.popular && <span className="popular-label">{t.popular}</span>}
+              {packages.length === 0 && <p className="packages-empty">{t.noPackagesAvailable}</p>}
+              {packages.map((pkg, index) => {
+                const localized = localizedPackage(pkg, language);
+                const isSelected = String(selectedPackage) === String(pkg.id);
+                const featured = index === Math.min(1, packages.length - 1);
+                return (
+                <article className={`package-card ${featured ? "featured" : ""} ${isSelected ? "active" : ""}`} key={pkg.id}>
+                  {featured && <span className="popular-label">{t.popular}</span>}
                   <div className="package-icon"><PackageCheck /></div>
-                  <h3>{t[pkg.nameKey]}</h3>
-                  <p>{t[pkg.descKey]}</p>
-                  <div className="price"><strong>{formatPrice(pkg.price, language)}</strong><span>{t.ks}</span></div>
-                  <ul>{t[pkg.itemsKey].map((item) => <li key={item}><Check size={16} />{item}</li>)}</ul>
-                  <button onClick={() => choosePackage(pkg.id)} className={selectedPackage === pkg.id ? "package-button selected" : "package-button"}>
-                    {selectedPackage === pkg.id ? <><CircleCheck size={18} />{t.selected}</> : <>{t.selectPackage}<ArrowRight size={17} /></>}
+                  <h3>{localized.name}</h3>
+                  <p>{localized.description}</p>
+                  <div className="price"><strong>{formatPrice(pkg.priceKs, language)}</strong><span>{t.ks}</span></div>
+                  <ul><li><Check size={16} />{t.fixedPackagePrice}</li><li><Check size={16} />{t.photoReviewIncluded}</li></ul>
+                  <button onClick={() => choosePackage(String(pkg.id))} className={isSelected ? "package-button selected" : "package-button"}>
+                    {isSelected ? <><CircleCheck size={18} />{t.selected}</> : <>{t.selectPackage}<ArrowRight size={17} /></>}
                   </button>
                 </article>
-              ))}
+              )})}
             </div>
           </div>
         </section>
@@ -325,22 +410,23 @@ function App() {
               {submitted ? (
                 <div className="success-state" id="order-result" tabIndex="-1">
                   <span className="success-icon"><CircleCheck /></span>
-                  <p className="eyebrow">EMC / DEMO</p>
+                  <p className="eyebrow">EMC / {submittedOrder?.orderNumber}</p>
                   <h3>{t.successTitle}</h3>
                   <p>{t.successBody}</p>
-                  <button className="secondary-button" onClick={() => setSubmitted(false)}>{t.editOrder}</button>
+                  {submittedOrder && <div className="submitted-total"><span>{t.orderTotal}</span><strong>{formatPrice(submittedOrder.totalPriceKs, language)} {t.ks}</strong></div>}
+                  <button className="secondary-button" onClick={() => { setSubmitted(false); setSubmittedOrder(null); }}>{t.placeAnotherOrder}</button>
                 </div>
               ) : (
                 <form onSubmit={submitOrder} noValidate>
                   <div className="form-section-heading"><span>01</span><h3>{t.contactSection}</h3></div>
                   <div className="field-grid">
-                    <label className="field"><span>{t.fullName} <small>{t.required}</small></span><input name="name" type="text" placeholder={t.fullNamePlaceholder} autoComplete="name" /></label>
-                    <label className="field"><span>{t.phone} <small>{t.required}</small></span><input name="phone" type="tel" inputMode="tel" placeholder={t.phonePlaceholder} autoComplete="tel" /></label>
-                    <label className="field full"><span>{t.address} <small>{t.required}</small></span><textarea name="address" rows="2" placeholder={t.addressPlaceholder} autoComplete="street-address" /></label>
+                    <label className="field"><span>{t.fullName} <small>{t.required}</small></span><input name="name" type="text" value={orderContact.name} onChange={(event) => setOrderContact((current) => ({ ...current, name: event.target.value }))} placeholder={t.fullNamePlaceholder} autoComplete="name" /></label>
+                    <label className="field"><span>{t.phone} <small>{t.required}</small></span><input name="phone" type="tel" inputMode="tel" value={orderContact.phone} onChange={(event) => setOrderContact((current) => ({ ...current, phone: event.target.value }))} placeholder={t.phonePlaceholder} autoComplete="tel" readOnly={Boolean(customer)} /></label>
+                    <label className="field full"><span>{t.address} <small>{t.required}</small></span><textarea name="address" rows="2" value={orderContact.address} onChange={(event) => setOrderContact((current) => ({ ...current, address: event.target.value }))} placeholder={t.addressPlaceholder} autoComplete="street-address" /></label>
                     <label className="field full"><span>{t.packageLabel} <small>{t.required}</small></span>
                       <select value={selectedPackage} onChange={(event) => setSelectedPackage(event.target.value)}>
                         <option value="">{t.choosePackagePlaceholder}</option>
-                        {packageDefinitions.map((pkg) => <option key={pkg.id} value={pkg.id}>{t[pkg.nameKey]} — {formatPrice(pkg.price, language)} {t.ks}</option>)}
+                        {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{localizedPackage(pkg, language).name} — {formatPrice(pkg.priceKs, language)} {t.ks}</option>)}
                       </select>
                     </label>
                   </div>
@@ -353,7 +439,7 @@ function App() {
                     </label>
                     <label className={handover === "pickup" ? "choice-card checked" : "choice-card"}>
                       <input type="radio" name="handover" value="pickup" checked={handover === "pickup"} onChange={() => setHandover("pickup")} />
-                      <span className="choice-icon"><Truck /></span><span><strong>{t.pickup}</strong><small>{t.pickupBody}</small></span><i><Check /></i>
+                      <span className="choice-icon"><Truck /></span><span><strong>{t.pickup}</strong><small>{pickupFee > 0 ? `${t.pickupFeeLabel}: ${formatPrice(pickupFee, language)} ${t.ks}` : t.pickupBody}</small></span><i><Check /></i>
                     </label>
                   </div>
                   <label className="field notes-field"><span>{t.notes}</span><textarea name="notes" rows="3" placeholder={t.notesPlaceholder} /></label>
@@ -379,7 +465,7 @@ function App() {
                   </div>
                   {formError && <p className="error-message form-error" role="alert">{formError}</p>}
                   <div className="submit-row">
-                    <button className="primary-button submit-button" type="submit">{t.submit}<ArrowRight size={18} /></button>
+                    <button className="primary-button submit-button" type="submit" disabled={submitting}>{submitting ? t.submittingOrder : t.submit}<ArrowRight size={18} /></button>
                     <span><ShieldCheck size={16} />{t.submitNote}</span>
                   </div>
                 </form>
@@ -402,9 +488,9 @@ function App() {
           customer={customer}
           t={t}
           onClose={() => setAccountMode(null)}
-          onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setAccountMode(null); }}
-          onProfileUpdate={setCustomer}
-          onLogout={() => { setCustomer(null); setAccountMode(null); }}
+          onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); setAccountMode(null); }}
+          onProfileUpdate={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
+          onLogout={() => { setCustomer(null); setOrderContact({ name: "", phone: "", address: "" }); setAccountMode(null); }}
         />
       )}
     </div>
