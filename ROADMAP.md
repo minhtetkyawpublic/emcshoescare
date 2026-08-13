@@ -32,6 +32,8 @@ Acceptance: the page looks and works well on phone, tablet, and desktop; switche
 
 ## Phase 2 — Database, PHP API, and customer accounts
 
+Status: **Implemented locally — pending customer UI review**
+
 - Define the MySQL schema and versioned SQL migrations
 - Create a small structured PHP API with configuration, routing, validation, and JSON responses
 - Secure phone-number/password registration and login (`password_hash` / `password_verify`)

@@ -15,10 +15,13 @@ import {
   Store,
   Truck,
   Upload,
+  UserRound,
   Wrench,
   X,
 } from "lucide-react";
 import { packageDefinitions, translations } from "./i18n/translations";
+import { accountApi } from "./api/client";
+import AccountModal from "./components/AccountModal";
 
 const MAX_PHOTOS = 10;
 
@@ -77,6 +80,8 @@ function App() {
   const [formError, setFormError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [customer, setCustomer] = useState(null);
+  const [accountMode, setAccountMode] = useState(null);
   const fileInput = useRef(null);
   const t = translations[language];
 
@@ -92,6 +97,16 @@ function App() {
     };
     window.addEventListener("beforeinstallprompt", handlePrompt);
     return () => window.removeEventListener("beforeinstallprompt", handlePrompt);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    accountApi.session()
+      .then((data) => {
+        if (active && data.authenticated) setCustomer(data.customer);
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
 
   const scrollTo = (id) => {
@@ -175,6 +190,13 @@ function App() {
               <Languages size={17} /><span>{t.languageName}</span>
             </button>
             <button className="install-button" onClick={handleInstall}><Upload size={16} /><span>{t.install}</span></button>
+            {customer ? (
+              <button className="account-button signed-in" onClick={() => setAccountMode("profile")}>
+                <span><UserRound size={16} /></span><strong>{customer.fullName.split(" ")[0]}</strong>
+              </button>
+            ) : (
+              <button className="account-button" onClick={() => setAccountMode("login")}><UserRound size={16} /><strong>{t.signIn}</strong></button>
+            )}
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="Toggle menu">
               {menuOpen ? <X /> : <Menu />}
             </button>
@@ -374,6 +396,17 @@ function App() {
           <span>{t.footerPhase}</span>
         </div>
       </footer>
+      {accountMode && (
+        <AccountModal
+          mode={accountMode}
+          customer={customer}
+          t={t}
+          onClose={() => setAccountMode(null)}
+          onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setAccountMode(null); }}
+          onProfileUpdate={setCustomer}
+          onLogout={() => { setCustomer(null); setAccountMode(null); }}
+        />
+      )}
     </div>
   );
 }

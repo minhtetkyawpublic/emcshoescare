@@ -20,6 +20,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: var(--paper); }
+body.modal-open { overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 .myanmar, .myanmar button, .myanmar input, .myanmar textarea, .myanmar select { font-family: "Noto Sans Myanmar", "DM Sans", sans-serif; }
@@ -43,6 +44,10 @@ button { cursor: pointer; }
 .language-button, .install-button { height: 42px; display: inline-flex; align-items: center; gap: 7px; border-radius: 11px; padding: 0 14px; font-weight: 700; }
 .language-button { border: 1px solid var(--line); color: var(--ink); background: white; }
 .install-button { border: 1px solid var(--red); color: white; background: var(--red); }
+.account-button { height: 42px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
+.account-button strong { font-size: 12px; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-button:hover { border-color: #cda8b1; color: var(--red); }
+.account-button.signed-in > span { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: var(--red-soft); color: var(--red); }
 .menu-button { display: none; border: 0; background: transparent; padding: 7px; color: var(--ink); }
 
 .hero-section { position: relative; overflow: hidden; padding: 92px 0 0; background: linear-gradient(145deg, #fffdfa 0%, #f9f1ec 100%); }
@@ -208,6 +213,54 @@ footer { background: #171214; color: white; padding: 34px 0; }
 .footer-inner p { margin: 0 auto; color: #bdb4b6; font-size: 13px; }
 .footer-inner > span { color: #847a7d; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
 
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(24,20,22,.58); backdrop-filter: blur(7px); padding: 24px; display: grid; place-items: center; overflow-y: auto; animation: modal-fade .18s ease-out; }
+.account-modal { width: min(100%, 510px); max-height: calc(100vh - 48px); overflow-y: auto; position: relative; background: var(--paper); border: 1px solid rgba(255,255,255,.7); border-radius: 25px; padding: 34px 38px; box-shadow: 0 30px 90px rgba(30,7,14,.3); animation: modal-rise .24s ease-out; }
+.modal-close { position: absolute; right: 20px; top: 20px; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: white; }
+.modal-close:hover { color: var(--red); border-color: #dcb6bf; }
+.modal-close svg { width: 18px; }
+.account-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 28px; }
+.account-brand > span { width: 38px; height: 38px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: white; display: grid; place-items: center; }
+.account-brand img { width: 150%; height: 150%; object-fit: contain; }
+.account-brand strong { color: var(--red); font: 800 20px/1 "Manrope", sans-serif; letter-spacing: -.04em; }
+.account-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--cream); margin-bottom: 30px; }
+.account-tabs button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
+.account-tabs button.active { color: var(--ink); background: white; box-shadow: 0 3px 12px rgba(48,31,35,.08); }
+.account-heading { margin-bottom: 25px; }
+.account-heading .eyebrow { margin-bottom: 12px; }
+.account-heading h2 { margin: 0; font: 800 30px/1.15 "Manrope", sans-serif; letter-spacing: -.045em; }
+.account-heading > p:not(.eyebrow) { margin: 11px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.account-form { display: grid; gap: 17px; }
+.account-field { display: grid; gap: 7px; }
+.account-field > span { font-size: 12px; font-weight: 800; }
+.account-field input, .account-field textarea { width: 100%; padding: 12px 13px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); outline: none; resize: vertical; }
+.account-field input:focus, .account-field textarea:focus { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+.account-field input::placeholder, .account-field textarea::placeholder { color: #aaa1a3; }
+.account-field > small { color: var(--muted); font-size: 10px; }
+.password-field, .locked-field { position: relative; }
+.password-field input { padding-right: 46px; }
+.password-field button { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; }
+.password-field button svg { width: 18px; }
+.locked-field svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #91878a; }
+.locked-field input { padding-left: 40px; background: #f5f1ed; color: var(--muted); }
+.remember-row { display: grid; grid-template-columns: 19px 1fr; align-items: start; gap: 10px; cursor: pointer; }
+.remember-row input { width: 18px; height: 18px; accent-color: var(--red); margin: 1px 0 0; }
+.remember-row > span { display: grid; gap: 3px; }
+.remember-row strong { font-size: 12px; }
+.remember-row small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.account-submit { width: 100%; min-height: 48px; margin-top: 3px; }
+.account-submit:disabled, .logout-button:disabled, .modal-close:disabled { cursor: wait; opacity: .65; }
+.account-error, .account-success { margin: 0; padding: 10px 12px; border-radius: 9px; font-size: 11px; line-height: 1.5; }
+.account-error { color: #96102d; background: #fff0f3; }
+.account-success { color: #1b654a; background: #e9f6f0; display: flex; align-items: center; gap: 7px; }
+.account-switch { margin: 20px 0 0; text-align: center; color: var(--muted); font-size: 11px; }
+.account-switch button { border: 0; padding: 0; color: var(--red); background: transparent; font-weight: 800; }
+.account-security { display: flex; align-items: flex-start; gap: 8px; padding-top: 19px; margin: 20px 0 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.5; }
+.account-security svg { color: var(--green); flex: 0 0 auto; }
+.account-divider { height: 1px; background: var(--line); margin: 26px 0 18px; }
+.logout-button { border: 0; color: #8d1831; background: transparent; display: inline-flex; align-items: center; gap: 8px; font-weight: 800; padding: 7px 0; font-size: 12px; }
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-rise { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+
 @media (max-width: 940px) {
   .desktop-nav { position: fixed; inset: 76px 0 auto; padding: 16px 20px 22px; background: var(--paper); border-bottom: 1px solid var(--line); display: none; flex-direction: column; align-items: stretch; }
   .desktop-nav.open { display: flex; }
@@ -232,6 +285,7 @@ footer { background: #171214; color: white; padding: 34px 0; }
   .logo-frame { width: 40px; height: 40px; }
   .language-button { padding: 0 11px; }
   .language-button span { font-size: 12px; }
+  .account-button strong { max-width: 74px; }
   .hero-section { padding-top: 62px; }
   .hero-grid { display: block; min-height: 0; }
   .hero-copy { padding-bottom: 20px; }
@@ -260,6 +314,9 @@ footer { background: #171214; color: white; padding: 34px 0; }
 @media (max-width: 470px) {
   .header-actions { gap: 4px; }
   .install-button { padding: 0 11px; }
+  .language-button span, .account-button strong { display: none; }
+  .language-button, .account-button { width: 40px; padding: 0; justify-content: center; }
+  .account-button.signed-in > span { background: transparent; width: auto; height: auto; }
   .hero-actions { align-items: stretch; flex-direction: column; gap: 5px; }
   .hero-actions .primary-button { width: 100%; }
   .hero-actions .text-button { justify-content: center; }
@@ -275,6 +332,9 @@ footer { background: #171214; color: white; padding: 34px 0; }
   .submit-button { width: 100%; }
   .submit-row > span { justify-content: center; text-align: center; }
   .success-state { padding: 22px 5px; }
+  .modal-backdrop { padding: 0; align-items: end; }
+  .account-modal { width: 100%; max-height: 94vh; border-radius: 24px 24px 0 0; padding: 27px 20px 30px; }
+  .account-heading h2 { font-size: 27px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
