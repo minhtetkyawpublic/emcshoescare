@@ -7,7 +7,7 @@ Mobile-first React Progressive Web App for EMC Shoes Care Myanmar. The planned p
 Phase 1 contains the bilingual public landing page. Phase 2 adds phone/password customer accounts. Phase 3 adds the admin dashboard, database-managed packages, optional pickup fees, real orders, private photo storage, and customer order history. Phase 4 adds guarded status transitions, bilingual admin notes, customer timelines, and unread in-app updates. Phase 5 completes the installable PWA experience, safe offline fallback, recoverable uploads, and production hardening. The backend remains plain PHP and MySQL. See [ROADMAP.md](./ROADMAP.md) for the full delivery plan.
 
 Phase 6 release preparation is tracked in [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md). Production setup, backup/retention operations, and staff/customer instructions are in `docs/`.
-The real shop details, packages, and privacy wording can be supplied with `docs/CONTENT_WORKSHEET.md` before the final release.
+The real shop details, packages, and privacy wording can be supplied with `docs/CONTENT_WORKSHEET.md` before the final release. Record physical-device, workflow, content, and production sign-off in `docs/ACCEPTANCE_TEST.md`.
 
 ## Run locally
 

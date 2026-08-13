@@ -50,7 +50,7 @@ try {
       throw "Migration uses MariaDB-only ADD COLUMN syntax instead of the MySQL-compatible conditional pattern: $($_.Name)"
     }
   }
-  foreach ($required in @('RELEASE_CHECKLIST.md', 'docs\CONTENT_WORKSHEET.md', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md', 'docs\HANDOVER.md', 'database\migrations\004_add_order_idempotency.sql')) {
+  foreach ($required in @('RELEASE_CHECKLIST.md', 'docs\CONTENT_WORKSHEET.md', 'docs\ACCEPTANCE_TEST.md', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md', 'docs\HANDOVER.md', 'database\migrations\004_add_order_idempotency.sql')) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Required release file is missing: $required" }
   }
   & git diff --check

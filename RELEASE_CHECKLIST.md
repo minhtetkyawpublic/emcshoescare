@@ -2,6 +2,8 @@
 
 This is the authoritative Phase 6 approval record. Do not create the final release tag until every launch gate is checked.
 
+Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT_WORKSHEET.md` for the approved shop copy and package data.
+
 ## Implemented and automatically verified
 
 - [x] React customer/admin interfaces with plain PHP and MySQL
