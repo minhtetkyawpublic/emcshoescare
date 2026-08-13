@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           for migration in database/migrations/*.sql; do
-            mysql --protocol=tcp --host=127.0.0.1 --user=root < "$migration"
+            docker exec -i "${{ job.services.mysql.id }}" mysql --user=root < "$migration"
           done
 
       - name: Create temporary administrator and start API
