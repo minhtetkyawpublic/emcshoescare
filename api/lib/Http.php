@@ -17,6 +17,8 @@ function configureHttp(array $config): void
 {
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Permissions-Policy: geolocation=(), microphone=()');
     header('Referrer-Policy: same-origin');
     header('Cache-Control: no-store, private');
 

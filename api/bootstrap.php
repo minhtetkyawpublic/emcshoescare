@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const EMC_API_VERSION = '4.0.0';
+const EMC_API_VERSION = '5.0.0';
 
 $config = require __DIR__ . '/config.php';
 

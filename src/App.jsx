@@ -22,8 +22,11 @@ import {
 import { packageDefinitions, translations } from "./i18n/translations";
 import { accountApi } from "./api/client";
 import AccountModal from "./components/AccountModal";
+import InstallGuide, { NetworkSignals } from "./components/AppSignals";
+import { clearOrderDraft, loadOrderDraft, newRequestId, saveOrderDraft } from "./orderDraft";
 
 const MAX_PHOTOS = 10;
+const MAX_SOURCE_PHOTO_BYTES = 20 * 1024 * 1024;
 
 const fallbackPackages = packageDefinitions.map((pkg, index) => ({
   ...pkg,
@@ -97,14 +100,20 @@ function App() {
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
   const [formError, setFormError] = useState("");
+  const [formNotice, setFormNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submittedOrder, setSubmittedOrder] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
+  const [installed, setInstalled] = useState(() => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true);
   const [customer, setCustomer] = useState(null);
   const [accountMode, setAccountMode] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [orderContact, setOrderContact] = useState({ name: "", phone: "", address: "" });
+  const [orderNotes, setOrderNotes] = useState("");
+  const [clientRequestId, setClientRequestId] = useState(newRequestId);
+  const [recoveredDraft, setRecoveredDraft] = useState(null);
   const fileInput = useRef(null);
   const t = translations[language];
 
@@ -119,7 +128,21 @@ function App() {
       setInstallPrompt(event);
     };
     window.addEventListener("beforeinstallprompt", handlePrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handlePrompt);
+    const handleInstalled = () => {
+      setInstalled(true);
+      setInstallGuideOpen(false);
+    };
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handlePrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadOrderDraft().then((draft) => {
+      if (draft?.photos?.length) setRecoveredDraft(draft);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -184,11 +207,12 @@ function App() {
 
   const handleInstall = async () => {
     if (!installPrompt) {
-      window.alert(t.installHelp);
+      setInstallGuideOpen(true);
       return;
     }
     installPrompt.prompt();
-    await installPrompt.userChoice;
+    const result = await installPrompt.userChoice;
+    if (result.outcome !== "accepted") setInstallGuideOpen(true);
     setInstallPrompt(null);
   };
 
@@ -204,8 +228,13 @@ function App() {
       setPhotoError(t.photoLimitError);
       return;
     }
+    if (chosen.some((file) => file.size > MAX_SOURCE_PHOTO_BYTES)) {
+      setPhotoError(t.photoSourceSizeError);
+      return;
+    }
     try {
-      const compressed = await Promise.all(chosen.map(compressImage));
+      const compressed = [];
+      for (const file of chosen) compressed.push(await compressImage(file));
       const items = compressed.map((file, index) => ({
         id: `${Date.now()}-${index}`,
         file,
@@ -216,6 +245,30 @@ function App() {
     } catch {
       setPhotoError(t.photoTypeError);
     }
+  };
+
+  const restoreDraft = () => {
+    if (!recoveredDraft || !customer || Number(recoveredDraft.customerId) !== Number(customer.id)) return;
+    photos.forEach((photo) => URL.revokeObjectURL(photo.url));
+    setOrderContact(recoveredDraft.contact);
+    setSelectedPackage(String(recoveredDraft.packageId));
+    setHandover(recoveredDraft.handover);
+    setOrderNotes(recoveredDraft.notes || "");
+    setClientRequestId(recoveredDraft.clientRequestId);
+    setPhotos(recoveredDraft.photos.map((photo, index) => {
+      const file = new File([photo.blob], photo.name, { type: photo.type, lastModified: photo.lastModified });
+      return { id: `restored-${Date.now()}-${index}`, file, url: URL.createObjectURL(file), originalSize: photo.originalSize };
+    }));
+    setRecoveredDraft(null);
+    setFormError("");
+    setFormNotice(t.draftRestored);
+    setTimeout(() => document.getElementById("order")?.scrollIntoView({ behavior: "smooth" }), 0);
+  };
+
+  const discardDraft = async () => {
+    await clearOrderDraft().catch(() => {});
+    setRecoveredDraft(null);
+    setClientRequestId(newRequestId());
   };
 
   const removePhoto = (id) => {
@@ -238,22 +291,50 @@ function App() {
       return;
     }
     setFormError("");
+    setFormNotice("");
     setSubmitting(true);
     const payload = new FormData();
     payload.append("fullName", orderContact.name);
     payload.append("address", orderContact.address);
     payload.append("packageId", selectedPackage);
     payload.append("handover", handover);
-    payload.append("notes", String(new FormData(event.currentTarget).get("notes") || ""));
+    payload.append("notes", orderNotes);
+    payload.append("clientRequestId", clientRequestId);
     photos.forEach((photo) => payload.append("photos[]", photo.file, photo.file.name));
     try {
+      let draftSaved = false;
+      try {
+        await saveOrderDraft({
+          customerId: customer.id,
+          contact: orderContact,
+          packageId: selectedPackage,
+          handover,
+          notes: orderNotes,
+          clientRequestId,
+          photos: photos.map((photo) => ({
+            blob: photo.file,
+            name: photo.file.name,
+            type: photo.file.type,
+            lastModified: photo.file.lastModified,
+            originalSize: photo.originalSize,
+          })),
+        });
+        draftSaved = true;
+      } catch { /* The upload can still proceed if private browser storage is unavailable. */ }
+      if (!navigator.onLine) {
+        setFormError(draftSaved ? t.draftSavedOffline : t.orderSubmitError);
+        return;
+      }
       const data = await accountApi.createOrder(payload);
+      await clearOrderDraft().catch(() => {});
       setCustomer(data.customer);
       setOrderContact({ name: data.customer.fullName, phone: data.customer.phone, address: data.customer.address || "" });
       setSubmittedOrder(data.order);
       setSubmitted(true);
       photos.forEach((photo) => URL.revokeObjectURL(photo.url));
       setPhotos([]);
+      setOrderNotes("");
+      setClientRequestId(newRequestId());
       setTimeout(() => document.getElementById("order-result")?.focus(), 0);
     } catch (error) {
       const messages = {
@@ -263,7 +344,7 @@ function App() {
         photo_size_invalid: t.photoSizeError,
         photo_type_invalid: t.photoTypeError,
       };
-      setFormError(messages[error?.code] || t.orderSubmitError);
+      setFormError(messages[error?.code] || (navigator.onLine ? t.orderSubmitError : t.draftSavedOffline));
       if (error?.status === 401) {
         setCustomer(null);
         setAccountMode("login");
@@ -278,6 +359,7 @@ function App() {
 
   return (
     <div className={language === "mm" ? "app myanmar" : "app"}>
+      <NetworkSignals t={t} />
       <header className="site-header">
         <div className="container header-inner">
           <button className="brand-button" onClick={() => scrollTo("top")} aria-label={t.brandName}><Logo /></button>
@@ -306,6 +388,13 @@ function App() {
       </header>
 
       <main id="top">
+        {recoveredDraft && customer && Number(recoveredDraft.customerId) === Number(customer.id) && (
+          <aside className="draft-recovery" aria-live="polite">
+            <div><strong>{t.draftFoundTitle}</strong><span>{t.draftFoundBody}</span></div>
+            <button type="button" onClick={restoreDraft}>{t.restoreDraft}</button>
+            <button type="button" className="draft-discard" onClick={discardDraft}>{t.discardDraft}</button>
+          </aside>
+        )}
         <section className="hero-section">
           <div className="hero-glow hero-glow-one" />
           <div className="hero-glow hero-glow-two" />
@@ -463,7 +552,7 @@ function App() {
                       <span className="choice-icon"><Truck /></span><span><strong>{t.pickup}</strong><small>{pickupFee > 0 ? `${t.pickupFeeLabel}: ${formatPrice(pickupFee, language)} ${t.ks}` : t.pickupBody}</small></span><i><Check /></i>
                     </label>
                   </div>
-                  <label className="field notes-field"><span>{t.notes}</span><textarea name="notes" rows="3" placeholder={t.notesPlaceholder} /></label>
+                  <label className="field notes-field"><span>{t.notes}</span><textarea name="notes" rows="3" value={orderNotes} onChange={(event) => setOrderNotes(event.target.value)} placeholder={t.notesPlaceholder} /></label>
 
                   <div className="form-section-heading spaced"><span>03</span><h3>{t.photosSection}</h3></div>
                   <p className="field-hint">{t.photosHint}</p>
@@ -478,13 +567,14 @@ function App() {
                   <div className="photo-grid">
                     {photos.map((photo, index) => (
                       <div className="photo-preview" key={photo.id}>
-                        <img src={photo.url} alt={`${t.photosSection} ${index + 1}`} />
+                        <img src={photo.url} alt={`${t.photosSection} ${index + 1}`} loading="lazy" />
                         <button type="button" onClick={() => removePhoto(photo.id)} aria-label={t.remove}><X /></button>
                         <span>{Math.max(1, Math.round(photo.file.size / 1024))} KB</span>
                       </div>
                     ))}
                   </div>
                   {formError && <p className="error-message form-error" role="alert">{formError}</p>}
+                  {formNotice && <p className="form-notice" role="status">{formNotice}</p>}
                   <div className="submit-row">
                     <button className="primary-button submit-button" type="submit" disabled={submitting}>{submitting ? t.submittingOrder : t.submit}<ArrowRight size={18} /></button>
                     <span><ShieldCheck size={16} />{t.submitNote}</span>
@@ -515,6 +605,14 @@ function App() {
           onUnreadChange={setUnreadCount}
         />
       )}
+      <InstallGuide
+        open={installGuideOpen}
+        onClose={() => setInstallGuideOpen(false)}
+        onInstall={handleInstall}
+        canPrompt={Boolean(installPrompt)}
+        installed={installed}
+        t={t}
+      />
     </div>
   );
 }

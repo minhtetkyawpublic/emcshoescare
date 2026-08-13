@@ -35,12 +35,16 @@ function normalizeUploadList(string $field): array
 
 function validateOrderInput(PDO $pdo, array $config): array
 {
+    $clientRequestId = strtolower(trim((string) ($_POST['clientRequestId'] ?? '')));
     $name = trim((string) ($_POST['fullName'] ?? ''));
     $address = trim((string) ($_POST['address'] ?? ''));
     $notes = trim((string) ($_POST['notes'] ?? ''));
     $fulfillment = (string) ($_POST['handover'] ?? 'dropoff');
     $packageId = filter_var($_POST['packageId'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $fields = [];
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $clientRequestId)) {
+        $fields['clientRequestId'] = 'A valid request identifier is required.';
+    }
     if (mb_strlen($name) < 2 || mb_strlen($name) > 120) $fields['fullName'] = 'Enter a valid name.';
     if (mb_strlen($address) < 3 || mb_strlen($address) > 500) $fields['address'] = 'Enter a valid address.';
     if (mb_strlen($notes) > 2000) $fields['notes'] = 'Notes cannot exceed 2,000 characters.';
@@ -91,7 +95,7 @@ function validateOrderInput(PDO $pdo, array $config): array
         $setting->execute();
         $pickupFee = max(0, (int) ($setting->fetchColumn() ?: 0));
     }
-    return compact('name', 'address', 'notes', 'fulfillment', 'package', 'validatedPhotos', 'pickupFee');
+    return compact('clientRequestId', 'name', 'address', 'notes', 'fulfillment', 'package', 'validatedPhotos', 'pickupFee');
 }
 
 function allowedOrderTransitions(array $order): array

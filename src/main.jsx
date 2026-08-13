@@ -15,5 +15,15 @@ createRoot(document.getElementById("root")).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   const serviceWorkerUrl = new URL(/* @vite-ignore */ "../sw.js", import.meta.url).pathname;
-  window.addEventListener("load", () => navigator.serviceWorker.register(serviceWorkerUrl));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register(serviceWorkerUrl).then((registration) => {
+      const watchWorker = (worker) => worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          window.dispatchEvent(new CustomEvent("emc-update-available", { detail: worker }));
+        }
+      });
+      watchWorker(registration.installing);
+      registration.addEventListener("updatefound", () => watchWorker(registration.installing));
+    }).catch(() => {});
+  });
 }

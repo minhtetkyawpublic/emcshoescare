@@ -73,6 +73,8 @@ Acceptance: an admin can update an order, and the customer sees the correct stat
 
 ## Phase 5 — PWA completion and resilience
 
+Status: **Implemented; awaiting UI/UX acceptance.**
+
 - Final app icons/splash presentation using `emcicon.jpg`
 - Offline fallback and careful caching so account/order data never becomes stale or exposed
 - Install guidance for Android and iOS

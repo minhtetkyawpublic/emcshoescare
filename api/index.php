@@ -143,6 +143,21 @@ if ($method === 'POST' && $path === '/orders') {
     assertTrustedBrowserRequest($config);
     $session = currentSession($pdo, $config);
     assertCsrf($session);
+    $clientRequestId = strtolower(trim((string) ($_POST['clientRequestId'] ?? '')));
+    if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $clientRequestId)) {
+        $existing = $pdo->prepare('SELECT * FROM orders WHERE customer_id = ? AND client_request_id = ? LIMIT 1');
+        $existing->execute([$session['customer_id'], $clientRequestId]);
+        $existingOrder = $existing->fetch();
+        if ($existingOrder) {
+            $existingOrderId = (int) $existingOrder['id'];
+            jsonSuccess([
+                'order' => orderPayload($existingOrder, fetchOrderPhotos($pdo, $existingOrderId), fetchOrderHistory($pdo, $existingOrderId)),
+                'customer' => publicCustomer($session),
+                'csrfToken' => refreshCsrf($pdo, $session['id']),
+                'replayed' => true,
+            ]);
+        }
+    }
     $input = validateOrderInput($pdo, $config);
     $orderNumber = orderNumber($pdo);
     $storageKey = bin2hex(random_bytes(16));
@@ -157,13 +172,14 @@ if ($method === 'POST' && $path === '/orders') {
         $total = (int) $package['price_ks'] + $input['pickupFee'];
         $insert = $pdo->prepare(
             'INSERT INTO orders
-              (order_number, storage_key, customer_id, package_id, package_name_en, package_name_mm,
+              (order_number, client_request_id, storage_key, customer_id, package_id, package_name_en, package_name_mm,
                package_price_ks, pickup_fee_ks, total_price_ks, fulfillment_method, customer_name,
                customer_phone, customer_address, customer_notes, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $insert->execute([
             $orderNumber,
+            $input['clientRequestId'],
             $storageKey,
             $session['customer_id'],
             $package['id'],
@@ -225,6 +241,20 @@ if ($method === 'POST' && $path === '/orders') {
             if (is_file($createdFile)) unlink($createdFile);
         }
         if (is_dir($storageDirectory)) rmdir($storageDirectory);
+        if ($exception instanceof PDOException && $exception->getCode() === '23000') {
+            $replay = $pdo->prepare('SELECT * FROM orders WHERE customer_id = ? AND client_request_id = ? LIMIT 1');
+            $replay->execute([$session['customer_id'], $input['clientRequestId']]);
+            $replayedOrder = $replay->fetch();
+            if ($replayedOrder) {
+                $replayedOrderId = (int) $replayedOrder['id'];
+                jsonSuccess([
+                    'order' => orderPayload($replayedOrder, fetchOrderPhotos($pdo, $replayedOrderId), fetchOrderHistory($pdo, $replayedOrderId)),
+                    'customer' => publicCustomer($session),
+                    'csrfToken' => refreshCsrf($pdo, $session['id']),
+                    'replayed' => true,
+                ]);
+            }
+        }
         throw $exception;
     }
     $order = fetchOrder($pdo, $orderId);

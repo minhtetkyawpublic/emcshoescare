@@ -4,7 +4,7 @@ declare(strict_types=1);
 function publicCustomer(array $customer): array
 {
     return [
-        'id' => (int) $customer['id'],
+        'id' => (int) ($customer['customer_id'] ?? $customer['id']),
         'phone' => $customer['phone'],
         'fullName' => $customer['full_name'],
         'address' => $customer['address'],
