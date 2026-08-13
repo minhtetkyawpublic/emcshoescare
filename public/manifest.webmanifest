@@ -1,0 +1,18 @@
+{
+  "name": "EMC Shoes Care Myanmar",
+  "short_name": "EMC",
+  "description": "Professional shoe cleaning and repair from EMC Shoes Care Myanmar.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fffdf9",
+  "theme_color": "#a30f31",
+  "icons": [
+    {
+      "src": "./emcicon.jpg",
+      "sizes": "1024x1024",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
