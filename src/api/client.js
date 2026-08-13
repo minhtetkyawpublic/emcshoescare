@@ -76,6 +76,9 @@ export const accountApi = {
   order(orderId) {
     return request(`/orders/${orderId}`);
   },
+  markOrderSeen(orderId) {
+    return request(`/orders/${orderId}/seen`, { method: "POST" });
+  },
   async logout() {
     const data = await request("/auth/logout", { method: "POST" });
     csrfToken = "";

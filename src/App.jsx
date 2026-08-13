@@ -103,6 +103,7 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [accountMode, setAccountMode] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [orderContact, setOrderContact] = useState({ name: "", phone: "", address: "" });
   const fileInput = useRef(null);
   const t = translations[language];
@@ -139,12 +140,32 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!customer) return undefined;
+    let active = true;
+    const refreshUpdates = () => accountApi.orders()
+      .then((data) => {
+        if (active) setUnreadCount((data.orders || []).filter((order) => order.unreadStatus).length);
+      })
+      .catch(() => {});
+    const interval = window.setInterval(refreshUpdates, 60000);
+    window.addEventListener("focus", refreshUpdates);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshUpdates);
+    };
+  }, [customer]);
+
+  useEffect(() => {
     let active = true;
     accountApi.session()
       .then((data) => {
         if (active && data.authenticated) {
           setCustomer(data.customer);
           setOrderContact({ name: data.customer.fullName, phone: data.customer.phone, address: data.customer.address || "" });
+          accountApi.orders().then((ordersData) => {
+            if (active) setUnreadCount((ordersData.orders || []).filter((order) => order.unreadStatus).length);
+          }).catch(() => {});
         }
       })
       .catch(() => {});
@@ -272,7 +293,7 @@ function App() {
             <button className="install-button" onClick={handleInstall}><Upload size={16} /><span>{t.install}</span></button>
             {customer ? (
               <button className="account-button signed-in" onClick={() => setAccountMode("profile")}>
-                <span><UserRound size={16} /></span><strong>{customer.fullName.split(" ")[0]}</strong>
+                <span><UserRound size={16} />{unreadCount > 0 && <i className="account-unread" aria-label={`${unreadCount} ${t.newUpdates}`}>{unreadCount > 9 ? "9+" : unreadCount}</i>}</span><strong>{customer.fullName.split(" ")[0]}</strong>
               </button>
             ) : (
               <button className="account-button" onClick={() => setAccountMode("login")}><UserRound size={16} /><strong>{t.signIn}</strong></button>
@@ -490,7 +511,8 @@ function App() {
           onClose={() => setAccountMode(null)}
           onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); setAccountMode(null); }}
           onProfileUpdate={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
-          onLogout={() => { setCustomer(null); setOrderContact({ name: "", phone: "", address: "" }); setAccountMode(null); }}
+          onLogout={() => { setCustomer(null); setUnreadCount(0); setOrderContact({ name: "", phone: "", address: "" }); setAccountMode(null); }}
+          onUnreadChange={setUnreadCount}
         />
       )}
     </div>

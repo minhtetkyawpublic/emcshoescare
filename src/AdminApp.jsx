@@ -7,6 +7,7 @@ import PackageModal from "./admin/PackageModal";
 import AdminLogo from "./admin/AdminLogo";
 import { adminDateTime, adminPrice } from "./admin/utils";
 import { translations } from "./i18n/translations";
+import { statusLabel } from "./orderStatus";
 
 function AdminApp() {
   const [language, setLanguage] = useState(() => localStorage.getItem("emc-language") || "en");
@@ -68,6 +69,12 @@ function AdminApp() {
     } catch {
       setError(t.adminUnavailable);
     }
+  };
+
+  const orderUpdated = (updatedOrder) => {
+    setSelectedOrder(updatedOrder);
+    setOrders((current) => current.map((order) => order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order));
+    setNotice(t.statusUpdated);
   };
 
   const packageSaved = async () => {
@@ -136,7 +143,7 @@ function AdminApp() {
         </div>
       </main>
       {packageModal !== undefined && <PackageModal packageItem={packageModal} t={t} onClose={() => setPackageModal(undefined)} onSaved={packageSaved} />}
-      {selectedOrder && <OrderModal order={selectedOrder} language={language} t={t} onClose={() => setSelectedOrder(null)} />}
+      {selectedOrder && <OrderModal order={selectedOrder} language={language} t={t} onClose={() => setSelectedOrder(null)} onUpdated={orderUpdated} />}
     </div>
   );
 }
@@ -148,7 +155,7 @@ function OrdersPanel({ orders, language, t, onOpen }) {
       {orders.length === 0 ? <div className="admin-empty"><ClipboardList /><p>{t.noAdminOrders}</p></div> : (
         <div className="admin-order-table">
           <div className="admin-order-row table-head"><span>{t.orderNumber}</span><span>{t.customerLabel}</span><span>{t.packageLabelAdmin}</span><span>{t.orderTotal}</span><span>{t.submittedAt}</span><span /></div>
-          {orders.map((order) => <div className="admin-order-row" key={order.id}><span data-label={t.orderNumber}><strong>{order.orderNumber}</strong><em>{t.statusSubmitted}</em></span><span data-label={t.customerLabel}>{order.customer.name}<small>{order.customer.phone}</small></span><span data-label={t.packageLabelAdmin}>{language === "mm" ? order.package.nameMm : order.package.nameEn}<small>{order.photoCount} {t.photosSection}</small></span><span data-label={t.orderTotal}><strong>{adminPrice(order.totalPriceKs, language)} {t.ks}</strong></span><span data-label={t.submittedAt}>{adminDateTime(order.createdAt, language)}</span><span><button onClick={() => onOpen(order.id)} aria-label={`${t.viewOrder} ${order.orderNumber}`}><ChevronRight /></button></span></div>)}
+          {orders.map((order) => <div className="admin-order-row" key={order.id}><span data-label={t.orderNumber}><strong>{order.orderNumber}</strong><em className={`status-${order.status}`}>{statusLabel(order.status, t)}</em></span><span data-label={t.customerLabel}>{order.customer.name}<small>{order.customer.phone}</small></span><span data-label={t.packageLabelAdmin}>{language === "mm" ? order.package.nameMm : order.package.nameEn}<small>{order.photoCount} {t.photosSection}</small></span><span data-label={t.orderTotal}><strong>{adminPrice(order.totalPriceKs, language)} {t.ks}</strong></span><span data-label={t.submittedAt}>{adminDateTime(order.createdAt, language)}</span><span><button onClick={() => onOpen(order.id)} aria-label={`${t.viewOrder} ${order.orderNumber}`}><ChevronRight /></button></span></div>)}
         </div>
       )}
     </section>

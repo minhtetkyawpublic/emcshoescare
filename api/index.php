@@ -180,6 +180,18 @@ if ($method === 'POST' && $path === '/orders') {
             'submitted',
         ]);
         $orderId = (int) $pdo->lastInsertId();
+        $historyInsert = $pdo->prepare(
+            'INSERT INTO order_status_history
+              (order_id, from_status, to_status, note_en, note_mm, changed_by_admin_id, created_at)
+             VALUES (?, NULL, ?, ?, ?, NULL, UTC_TIMESTAMP(6))'
+        );
+        $historyInsert->execute([
+            $orderId,
+            'submitted',
+            'Order submitted to EMC.',
+            'အော်ဒါကို EMC သို့ တင်ပြီးပါပြီ။',
+        ]);
+        $pdo->prepare('UPDATE orders SET customer_seen_at = UTC_TIMESTAMP(6) WHERE id = ?')->execute([$orderId]);
         $photoInsert = $pdo->prepare(
             'INSERT INTO order_photos
               (order_id, storage_name, original_name, mime_type, size_bytes, width_px, height_px, sort_order)
@@ -217,7 +229,7 @@ if ($method === 'POST' && $path === '/orders') {
     }
     $order = fetchOrder($pdo, $orderId);
     jsonSuccess([
-        'order' => orderPayload($order, fetchOrderPhotos($pdo, $orderId)),
+        'order' => orderPayload($order, fetchOrderPhotos($pdo, $orderId), fetchOrderHistory($pdo, $orderId)),
         'customer' => [
             'id' => (int) $session['customer_id'],
             'phone' => $session['phone'],
@@ -231,8 +243,11 @@ if ($method === 'POST' && $path === '/orders') {
 if ($method === 'GET' && $path === '/orders') {
     $session = currentSession($pdo, $config);
     $statement = $pdo->prepare(
-        'SELECT o.*, COUNT(p.id) AS photo_count
-         FROM orders o LEFT JOIN order_photos p ON p.order_id = o.id
+        'SELECT o.*, COUNT(DISTINCT p.id) AS photo_count, MAX(h.created_at) AS latest_status_at,
+                CASE WHEN o.customer_seen_at IS NULL OR MAX(h.created_at) > o.customer_seen_at THEN 1 ELSE 0 END AS unread_status
+         FROM orders o
+         LEFT JOIN order_photos p ON p.order_id = o.id
+         LEFT JOIN order_status_history h ON h.order_id = o.id
          WHERE o.customer_id = ? GROUP BY o.id ORDER BY o.created_at DESC, o.id DESC'
     );
     $statement->execute([$session['customer_id']]);
@@ -248,8 +263,20 @@ if ($method === 'GET' && preg_match('#^/orders/(\d+)$#', $path, $matches)) {
         throw new ApiException('order_not_found', 'Order not found.', 404);
     }
     jsonSuccess([
-        'order' => orderPayload($order, fetchOrderPhotos($pdo, (int) $order['id'])),
+        'order' => orderPayload($order, fetchOrderPhotos($pdo, (int) $order['id']), fetchOrderHistory($pdo, (int) $order['id'])),
     ]);
+}
+
+if ($method === 'POST' && preg_match('#^/orders/(\d+)/seen$#', $path, $matches)) {
+    assertTrustedBrowserRequest($config);
+    $session = currentSession($pdo, $config);
+    assertCsrf($session);
+    $order = fetchOrder($pdo, (int) $matches[1]);
+    if (!$order || (int) $order['customer_id'] !== (int) $session['customer_id']) {
+        throw new ApiException('order_not_found', 'Order not found.', 404);
+    }
+    $pdo->prepare('UPDATE orders SET customer_seen_at = UTC_TIMESTAMP(6) WHERE id = ?')->execute([$order['id']]);
+    jsonSuccess(['seen' => true, 'csrfToken' => refreshCsrf($pdo, $session['id'])]);
 }
 
 if ($method === 'GET' && preg_match('#^/orders/(\d+)/photos/(\d+)$#', $path, $matches)) {
@@ -395,8 +422,10 @@ if ($method === 'PUT' && $path === '/admin/settings') {
 if ($method === 'GET' && $path === '/admin/orders') {
     $session = currentAdminSession($pdo, $config);
     $statement = $pdo->query(
-        'SELECT o.*, COUNT(p.id) AS photo_count
-         FROM orders o LEFT JOIN order_photos p ON p.order_id = o.id
+        'SELECT o.*, COUNT(DISTINCT p.id) AS photo_count, MAX(h.created_at) AS latest_status_at
+         FROM orders o
+         LEFT JOIN order_photos p ON p.order_id = o.id
+         LEFT JOIN order_status_history h ON h.order_id = o.id
          GROUP BY o.id ORDER BY o.created_at DESC, o.id DESC LIMIT 250'
     );
     jsonSuccess([
@@ -409,7 +438,51 @@ if ($method === 'GET' && preg_match('#^/admin/orders/(\d+)$#', $path, $matches))
     $order = fetchOrder($pdo, (int) $matches[1]);
     if (!$order) throw new ApiException('order_not_found', 'Order not found.', 404);
     jsonSuccess([
-        'order' => orderPayload($order, fetchOrderPhotos($pdo, (int) $order['id'])),
+        'order' => orderPayload($order, fetchOrderPhotos($pdo, (int) $order['id']), fetchOrderHistory($pdo, (int) $order['id'])),
+    ]);
+}
+
+if ($method === 'PUT' && preg_match('#^/admin/orders/(\d+)/status$#', $path, $matches)) {
+    assertTrustedBrowserRequest($config);
+    $session = currentAdminSession($pdo, $config);
+    assertAdminCsrf($session);
+    $body = jsonBody();
+    $nextStatus = trim((string) ($body['status'] ?? ''));
+    $noteEn = trim((string) ($body['noteEn'] ?? ''));
+    $noteMm = trim((string) ($body['noteMm'] ?? ''));
+    if (($noteEn === '' && $noteMm === '') || mb_strlen($noteEn) > 1000 || mb_strlen($noteMm) > 1500) {
+        throw new ApiException('status_note_required', 'Add an English or Myanmar note for the customer.', 422);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $locked = $pdo->prepare('SELECT * FROM orders WHERE id = ? FOR UPDATE');
+        $locked->execute([(int) $matches[1]]);
+        $order = $locked->fetch();
+        if (!$order) throw new ApiException('order_not_found', 'Order not found.', 404);
+        if (!in_array($nextStatus, allowedOrderTransitions($order), true)) {
+            throw new ApiException('invalid_status_transition', 'That status change is not allowed for this order.', 409);
+        }
+        $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?')->execute([$nextStatus, $order['id']]);
+        $history = $pdo->prepare(
+            'INSERT INTO order_status_history
+              (order_id, from_status, to_status, note_en, note_mm, changed_by_admin_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))'
+        );
+        $history->execute([$order['id'], $order['status'], $nextStatus, $noteEn, $noteMm, $session['admin_id']]);
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $exception;
+    }
+    $updatedOrder = fetchOrder($pdo, (int) $matches[1]);
+    jsonSuccess([
+        'order' => orderPayload(
+            $updatedOrder,
+            fetchOrderPhotos($pdo, (int) $updatedOrder['id']),
+            fetchOrderHistory($pdo, (int) $updatedOrder['id'])
+        ),
+        'csrfToken' => refreshAdminCsrf($pdo, $session['id']),
     ]);
 }
 

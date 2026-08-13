@@ -93,6 +93,10 @@
 .admin-order-row > span { min-width: 0; display: grid; gap: 4px; }
 .admin-order-row strong { font-size: 10px; }
 .admin-order-row em { width: max-content; padding: 3px 6px; border-radius: 99px; background: #e9f5ef; color: #247355; font-size: 7px; font-style: normal; font-weight: 800; }
+.admin-order-row em.status-repairing, .order-modal-title > em.status-repairing { background: #fff2d9; color: #8b5d08; }
+.admin-order-row em.status-ready, .order-modal-title > em.status-ready { background: #e8efff; color: #365d9b; }
+.admin-order-row em.status-done, .order-modal-title > em.status-done { background: #e6f3ec; color: #1c694b; }
+.admin-order-row em.status-cancelled, .order-modal-title > em.status-cancelled { background: #eee9e7; color: #756b6e; }
 .admin-order-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8c8285; font-size: 8px; }
 .admin-order-row > span:last-child button { width: 31px; height: 31px; border: 1px solid #e1d9d4; border-radius: 9px; background: white; color: #a30f31; display: grid; place-items: center; }
 .admin-order-row > span:last-child svg { width: 15px; }
@@ -161,6 +165,33 @@
 .admin-order-photos img { width: 100%; aspect-ratio: 1; border-radius: 9px; object-fit: cover; }
 .admin-order-photos > div > span { grid-column: 1 / -1; padding: 22px; border-radius: 10px; background: #f5f1ed; color: #857b7e; display: flex; justify-content: center; gap: 7px; font-size: 9px; }
 .admin-order-photos > div > span svg { width: 15px; }
+.admin-status-section { margin-top: 25px; padding-top: 22px; border-top: 1px solid #e5ddd8; }
+.admin-status-heading { display: flex; align-items: center; gap: 11px; }
+.admin-status-heading > span { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 11px; background: #f8e9ed; color: #a30f31; }
+.admin-status-heading svg { width: 18px; }
+.admin-status-heading > div { display: grid; gap: 2px; }
+.admin-status-heading small { color: #a30f31; font-size: 7px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+.admin-status-heading h3 { margin: 0; font: 800 15px/1.2 "Manrope", sans-serif; }
+.admin-status-timeline { margin: 18px 0 0 8px; }
+.admin-status-timeline article { position: relative; display: grid; grid-template-columns: 25px 1fr; gap: 10px; padding-bottom: 18px; }
+.admin-status-timeline article:not(:last-child)::before { content: ""; position: absolute; left: 11px; top: 23px; bottom: 0; width: 1px; background: #ddd5d0; }
+.admin-status-timeline article > i { position: relative; z-index: 1; width: 23px; height: 23px; border-radius: 50%; background: #eee8e4; color: #8a8083; display: grid; place-items: center; }
+.admin-status-timeline article.latest > i { background: #a30f31; color: white; box-shadow: 0 0 0 4px #f8e9ed; }
+.admin-status-timeline article > i svg { width: 12px; }
+.admin-status-timeline article > div > div { display: flex; justify-content: space-between; gap: 12px; }
+.admin-status-timeline strong { font-size: 10px; }
+.admin-status-timeline time { color: #8a8083; font-size: 8px; }
+.admin-status-timeline p { margin: 5px 0 3px; color: #5d5356; font-size: 9px; line-height: 1.55; }
+.admin-status-timeline small { color: #958b8e; font-size: 7px; }
+.admin-status-form { display: grid; gap: 12px; margin-top: 8px; padding: 20px; border-radius: 14px; background: #f6f2ee; }
+.admin-status-form label { display: grid; gap: 6px; }
+.admin-status-form label > span { font-size: 9px; font-weight: 800; }
+.admin-status-form select, .admin-status-form textarea { width: 100%; border: 1px solid #ddd5cf; border-radius: 9px; padding: 10px 11px; background: white; color: #1b1718; outline: none; resize: vertical; }
+.admin-status-form select:focus, .admin-status-form textarea:focus { border-color: #a30f31; box-shadow: 0 0 0 3px #f8e9ed; }
+.admin-status-form > p:not(.admin-error) { margin: -3px 0 0; color: #7e7477; font-size: 8px; line-height: 1.5; }
+.admin-status-form .admin-primary { justify-self: end; }
+.terminal-order { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; padding: 13px; border-radius: 10px; background: #e9f5ef; color: #247355; font-size: 9px; font-weight: 700; }
+.terminal-order svg { width: 16px; }
 @media (max-width: 1000px) {
   .admin-sidebar { width: 220px; }
   .admin-main { margin-left: 220px; }

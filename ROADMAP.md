@@ -61,6 +61,8 @@ Acceptance: packages displayed to customers come from the admin panel, and submi
 
 ## Phase 4 — Status tracking and notes
 
+Status: **Implemented locally — pending customer/admin UI review**
+
 - Status workflow: Submitted → Confirmed → Pickup scheduled → Rider on the way → Shoes received → Repairing → Ready for collection/delivery → Done
 - Cancelled status and safe transition rules
 - Admin note with every status update

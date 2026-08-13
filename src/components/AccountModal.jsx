@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, CalendarDays, Check, ChevronRight, Eye, EyeOff, Image, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, X } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, Eye, EyeOff, Image, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, X } from "lucide-react";
 import { accountApi, apiUrl } from "../api/client";
+import { localizedStatusNote, statusLabel } from "../orderStatus";
 
 function translatedError(error, t) {
   const messages = {
@@ -12,7 +13,7 @@ function translatedError(error, t) {
   return messages[error?.code] || t.accountUnavailable;
 }
 
-function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated, onProfileUpdate, onLogout }) {
+function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated, onProfileUpdate, onLogout, onUnreadChange }) {
   const [mode, setMode] = useState(customer ? "profile" : initialMode || "login");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,11 +43,16 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
     if (!customer) return;
     let active = true;
     accountApi.orders()
-      .then((data) => { if (active) setOrders(data.orders || []); })
+      .then((data) => {
+        if (!active) return;
+        const nextOrders = data.orders || [];
+        setOrders(nextOrders);
+        onUnreadChange(nextOrders.filter((order) => order.unreadStatus).length);
+      })
       .catch(() => { if (active) setOrdersError(t.ordersLoadError); })
       .finally(() => { if (active) setOrdersLoading(false); });
     return () => { active = false; };
-  }, [customer, t.ordersLoadError]);
+  }, [customer, onUnreadChange, t.ordersLoadError]);
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -124,6 +130,14 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
     try {
       const data = await accountApi.order(orderId);
       setSelectedOrder(data.order);
+      if (orders.find((order) => order.id === orderId)?.unreadStatus) {
+        await accountApi.markOrderSeen(orderId);
+        setOrders((current) => {
+          const updated = current.map((order) => order.id === orderId ? { ...order, unreadStatus: false } : order);
+          onUnreadChange(updated.filter((order) => order.unreadStatus).length);
+          return updated;
+        });
+      }
     } catch {
       setOrdersError(t.ordersLoadError);
     }
@@ -132,6 +146,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   const isMyanmar = t.languageName === "English";
   const orderPrice = (value) => new Intl.NumberFormat(isMyanmar ? "my-MM" : "en-US").format(value);
   const orderDate = (value) => new Intl.DateTimeFormat(isMyanmar ? "my-MM" : "en-GB", { dateStyle: "medium" }).format(new Date(value));
+  const orderDateTime = (value) => new Intl.DateTimeFormat(isMyanmar ? "my-MM" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
   const closeFromBackdrop = (event) => {
     if (event.target === event.currentTarget && !busy) onClose();
@@ -168,9 +183,9 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
                 {orders.map((order) => (
                   <div className={selectedOrder?.id === order.id ? "customer-order active" : "customer-order"} key={order.id}>
                     <button type="button" onClick={() => openOrder(order.id)}>
-                      <span className="order-list-icon"><CalendarDays /></span>
+                      <span className={order.unreadStatus ? "order-list-icon unread" : "order-list-icon"}>{order.unreadStatus ? <Bell /> : <CalendarDays />}</span>
                       <span><strong>{order.orderNumber}</strong><small>{isMyanmar ? order.package.nameMm : order.package.nameEn} · {orderDate(order.createdAt)}</small></span>
-                      <span className="order-list-end"><em>{t.statusSubmitted}</em><ChevronRight /></span>
+                      <span className="order-list-end">{order.unreadStatus && <b>{t.newUpdate}</b>}<em className={`status-${order.status}`}>{statusLabel(order.status, t)}</em><ChevronRight /></span>
                     </button>
                     {selectedOrder?.id === order.id && (
                       <div className="customer-order-detail">
@@ -181,6 +196,12 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
                           {selectedOrder.photos.map((photo, index) => <img key={photo.id} src={apiUrl(photo.url)} alt={`${t.photosSection} ${index + 1}`} />)}
                           {selectedOrder.photos.length === 0 && <span><Image />{t.noPhotos}</span>}
                         </div>
+                        <section className="customer-status-section">
+                          <div className="customer-status-heading"><Clock3 /><div><small>{t.currentStatus}</small><strong>{statusLabel(selectedOrder.status, t)}</strong></div></div>
+                          <div className="customer-timeline">
+                            {[...selectedOrder.history].reverse().map((entry, index) => <article key={entry.id} className={index === 0 ? "latest" : ""}><i><CheckCircle2 /></i><div><div><strong>{statusLabel(entry.status, t)}</strong><time>{orderDateTime(entry.createdAt)}</time></div><p>{localizedStatusNote(entry, isMyanmar ? "mm" : "en", t.noStatusNote)}</p><small>{entry.changedBy ? t.updatedByEmc : t.systemUpdate}</small></div></article>)}
+                          </div>
+                        </section>
                       </div>
                     )}
                   </div>

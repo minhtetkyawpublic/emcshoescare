@@ -1,4 +1,4 @@
-const CACHE_NAME = "emc-app-shell-v3";
+const CACHE_NAME = "emc-app-shell-v4";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./emcicon.jpg"];
 
 self.addEventListener("install", (event) => {

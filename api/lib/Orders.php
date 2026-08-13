@@ -94,7 +94,36 @@ function validateOrderInput(PDO $pdo, array $config): array
     return compact('name', 'address', 'notes', 'fulfillment', 'package', 'validatedPhotos', 'pickupFee');
 }
 
-function orderPayload(array $order, array $photos = []): array
+function allowedOrderTransitions(array $order): array
+{
+    $pickup = $order['fulfillment_method'] === 'pickup';
+    return match ($order['status']) {
+        'submitted' => ['confirmed', 'cancelled'],
+        'confirmed' => $pickup ? ['pickup_scheduled', 'cancelled'] : ['shoes_received', 'cancelled'],
+        'pickup_scheduled' => $pickup ? ['rider_on_way', 'cancelled'] : [],
+        'rider_on_way' => $pickup ? ['shoes_received', 'cancelled'] : [],
+        'shoes_received' => ['repairing', 'cancelled'],
+        'repairing' => ['ready', 'cancelled'],
+        'ready' => ['done'],
+        'done', 'cancelled' => [],
+        default => [],
+    };
+}
+
+function historyPayload(array $entry): array
+{
+    return [
+        'id' => (int) $entry['id'],
+        'fromStatus' => $entry['from_status'],
+        'status' => $entry['to_status'],
+        'noteEn' => $entry['note_en'],
+        'noteMm' => $entry['note_mm'],
+        'changedBy' => $entry['admin_name'] ?: null,
+        'createdAt' => (new DateTimeImmutable($entry['created_at'], new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM),
+    ];
+}
+
+function orderPayload(array $order, array $photos = [], array $history = []): array
 {
     return [
         'id' => (int) $order['id'],
@@ -115,6 +144,12 @@ function orderPayload(array $order, array $photos = []): array
         ],
         'notes' => $order['customer_notes'],
         'status' => $order['status'],
+        'unreadStatus' => isset($order['unread_status']) ? (bool) $order['unread_status'] : false,
+        'lastStatusAt' => !empty($order['latest_status_at'])
+            ? (new DateTimeImmutable($order['latest_status_at'], new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM)
+            : null,
+        'nextStatuses' => allowedOrderTransitions($order),
+        'history' => array_map('historyPayload', $history),
         'photoCount' => isset($order['photo_count']) ? (int) $order['photo_count'] : count($photos),
         'photos' => array_map(static fn(array $photo): array => [
             'id' => (int) $photo['id'],
@@ -137,6 +172,18 @@ function fetchOrder(PDO $pdo, int $orderId): ?array
 function fetchOrderPhotos(PDO $pdo, int $orderId): array
 {
     $statement = $pdo->prepare('SELECT * FROM order_photos WHERE order_id = ? ORDER BY sort_order, id');
+    $statement->execute([$orderId]);
+    return $statement->fetchAll();
+}
+
+function fetchOrderHistory(PDO $pdo, int $orderId): array
+{
+    $statement = $pdo->prepare(
+        'SELECT h.*, a.display_name AS admin_name
+         FROM order_status_history h
+         LEFT JOIN admins a ON a.id = h.changed_by_admin_id
+         WHERE h.order_id = ? ORDER BY h.created_at, h.id'
+    );
     $statement->execute([$orderId]);
     return $statement->fetchAll();
 }

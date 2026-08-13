@@ -65,4 +65,7 @@ export const adminApi = {
   order(id) {
     return adminRequest(`/admin/orders/${id}`);
   },
+  updateOrderStatus(id, details) {
+    return adminRequest(`/admin/orders/${id}/status`, { method: "PUT", body: JSON.stringify(details) });
+  },
 };

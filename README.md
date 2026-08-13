@@ -2,7 +2,7 @@
 
 Mobile-first React Progressive Web App for EMC Shoes Care Myanmar. The planned production stack is React, plain PHP, and MySQL.
 
-Phase 1 contains the bilingual public landing page. Phase 2 adds phone/password customer accounts. Phase 3 adds the admin dashboard, database-managed packages, optional pickup fees, real orders, private photo storage, and customer order history. The backend remains plain PHP and MySQL. See [ROADMAP.md](./ROADMAP.md) for the full delivery plan.
+Phase 1 contains the bilingual public landing page. Phase 2 adds phone/password customer accounts. Phase 3 adds the admin dashboard, database-managed packages, optional pickup fees, real orders, private photo storage, and customer order history. Phase 4 adds guarded status transitions, bilingual admin notes, customer timelines, and unread in-app updates. The backend remains plain PHP and MySQL. See [ROADMAP.md](./ROADMAP.md) for the full delivery plan.
 
 ## Run locally
 
@@ -15,7 +15,7 @@ The Vite development server forwards `/api` requests to the local XAMPP Apache s
 
 ## Phase 2 database setup
 
-Import the SQL files in `database/migrations` in numeric order using phpMyAdmin or the XAMPP MySQL client. Migration `001` creates the dedicated `emc_shoes_care` database and customer accounts; migration `002` adds the administrator, packages, settings, orders, and private photo metadata. Both can be run more than once safely.
+Import the SQL files in `database/migrations` in numeric order using phpMyAdmin or the XAMPP MySQL client. Migration `001` creates the dedicated `emc_shoes_care` database and customer accounts; migration `002` adds the administrator, packages, settings, orders, and private photo metadata; migration `003` adds status history and customer read-state tracking. The migrations can be run more than once safely.
 
 Local XAMPP defaults work without a configuration file (`root` with an empty password). For a different setup, copy the array shape from `api/config.php` into an ignored `api/config.local.php`, or set the variables documented in `.env.example` at the web-server level. The PHP API deliberately does not parse `.env` files or commit secrets.
 
