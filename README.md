@@ -63,6 +63,6 @@ With local XAMPP Apache/MySQL running and the local administrator configured, th
 .\tests\e2e-local.ps1 -AdminPassword '<local-admin-password>'
 ```
 
-The test restores the pickup fee and removes its temporary customers, order, package, sessions, and photo. Never run this local cleanup test against production.
+The test exercises pickup and drop-off orders, the ten-photo limit, every status transition, duplicate retry protection, unread updates, and cross-account access denial. It then restores the pickup fee and removes its temporary customers, orders, package, sessions, and photos. Never run this cleanup test against production. GitHub Actions repeats this workflow against an isolated MySQL service on every push and pull request.
 
 The interface text for both English and Myanmar is kept in `src/i18n/translations.js`. Phase 1 package names and demonstration prices are also defined there for easy replacement.

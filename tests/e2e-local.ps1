@@ -4,10 +4,19 @@ param(
   [string]$AdminUsername = 'emcadmin',
   [string]$BaseUrl = 'http://127.0.0.1/emcshoecare/api',
   [string]$MySqlBin = 'D:\xampp\mysql\bin',
+  [string]$MySqlClient = '',
+  [string]$CurlClient = '',
   [string]$PhotoPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'public\icon-192.png')
 )
 
 $ErrorActionPreference = 'Stop'
+$runningOnWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+if ([string]::IsNullOrWhiteSpace($MySqlClient)) {
+  $MySqlClient = if ($runningOnWindows) { Join-Path $MySqlBin 'mysql.exe' } else { 'mysql' }
+}
+if ([string]::IsNullOrWhiteSpace($CurlClient)) {
+  $CurlClient = if ($runningOnWindows) { 'curl.exe' } else { 'curl' }
+}
 $customerId = 0
 $otherCustomerId = 0
 $orderId = 0
@@ -94,7 +103,7 @@ try {
     '-F', 'address=Yangon release test address', '-F', "packageId=$($package.id)",
     '-F', 'handover=pickup', '-F', 'notes=Full release workflow test')
   1..10 | ForEach-Object { $multipart += @('-F', "photos[]=@$PhotoPath;type=image/png") }
-  $firstRaw = & curl.exe @multipart "$BaseUrl/orders"
+  $firstRaw = & $CurlClient @multipart "$BaseUrl/orders"
   $firstOrder = $firstRaw | ConvertFrom-Json
   Assert-True $firstOrder.success "Order creation succeeds: $firstRaw"
   $orderId = [int]$firstOrder.data.order.id
@@ -103,7 +112,7 @@ try {
   Assert-True ([int]$firstOrder.data.order.photoCount -eq 10) 'Order stores the maximum of ten photos.'
 
   $multipart[4] = "X-CSRF-Token: $customerCsrf"
-  $replayRaw = & curl.exe @multipart "$BaseUrl/orders"
+  $replayRaw = & $CurlClient @multipart "$BaseUrl/orders"
   $replay = $replayRaw | ConvertFrom-Json
   Assert-True ($replay.success -and $replay.data.replayed -and [int]$replay.data.order.id -eq $orderId) 'Retry returns the original order without duplication.'
   $customerCsrf = $replay.data.csrfToken
@@ -114,7 +123,7 @@ try {
     '-F', 'address=Yangon release test address', '-F', "packageId=$($package.id)",
     '-F', 'handover=dropoff', '-F', 'notes=Drop-off release workflow test',
     '-F', "photos[]=@$PhotoPath;type=image/png")
-  $dropoffRaw = & curl.exe @dropoffMultipart "$BaseUrl/orders"
+  $dropoffRaw = & $CurlClient @dropoffMultipart "$BaseUrl/orders"
   $dropoffOrder = $dropoffRaw | ConvertFrom-Json
   Assert-True $dropoffOrder.success "Drop-off order creation succeeds: $dropoffRaw"
   $dropoffOrderId = [int]$dropoffOrder.data.order.id
@@ -198,14 +207,14 @@ finally {
   if ($adminSession -and $adminCsrf) {
     try { Invoke-JsonApi 'POST' '/admin/auth/logout' $adminSession $null $adminCsrf | Out-Null } catch { }
   }
-  $mysql = Join-Path $MySqlBin 'mysql.exe'
-  if (Test-Path -LiteralPath $mysql) {
+  $mysql = Get-Command $MySqlClient -ErrorAction SilentlyContinue
+  if ($mysql) {
     if ($pickupFeeChanged) {
-      & $mysql -u root -D emc_shoes_care -e "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';"
+      & $MySqlClient -u root -D emc_shoes_care -e "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';"
     }
     $cleanupOrderIds = @($orderId, $dropoffOrderId) | Where-Object { $_ -gt 0 }
     foreach ($cleanupOrderId in $cleanupOrderIds) {
-      $photoRows = & $mysql -u root -N -B -D emc_shoes_care -e "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;"
+      $photoRows = & $MySqlClient -u root -N -B -D emc_shoes_care -e "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;"
       foreach ($photoRow in @($photoRows)) {
         if ($photoRow) {
           $parts = $photoRow -split "`t"
@@ -214,11 +223,11 @@ finally {
           }
         }
       }
-      & $mysql -u root -D emc_shoes_care -e "DELETE FROM orders WHERE id=$cleanupOrderId;"
+      & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM orders WHERE id=$cleanupOrderId;"
     }
-    if ($testPackageId -gt 0) { & $mysql -u root -D emc_shoes_care -e "DELETE FROM packages WHERE id=$testPackageId;" }
-    if ($customerId -gt 0) { & $mysql -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$customerId; DELETE FROM customers WHERE id=$customerId;" }
-    if ($otherCustomerId -gt 0) { & $mysql -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$otherCustomerId; DELETE FROM customers WHERE id=$otherCustomerId;" }
+    if ($testPackageId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM packages WHERE id=$testPackageId;" }
+    if ($customerId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$customerId; DELETE FROM customers WHERE id=$customerId;" }
+    if ($otherCustomerId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$otherCustomerId; DELETE FROM customers WHERE id=$otherCustomerId;" }
   }
   foreach ($storageRecord in $storageRecords) {
     $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'storage\order-photos'))
