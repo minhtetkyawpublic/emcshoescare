@@ -97,14 +97,20 @@ jobs:
 
       - name: Run complete customer and administrator workflow
         shell: pwsh
-        run: >-
-          ./tests/e2e-local.ps1
-          -AdminUsername emcaudit
-          -AdminPassword 'EMC-Release-Audit-2026!'
-          -BaseUrl http://127.0.0.1:8080
-          -MySqlClient mysql
-          -MySqlHost 127.0.0.1
-          -CurlClient curl
+        run: |
+          try {
+            ./tests/e2e-local.ps1 `
+              -AdminUsername emcaudit `
+              -AdminPassword 'EMC-Release-Audit-2026!' `
+              -BaseUrl http://127.0.0.1:8080 `
+              -MySqlClient mysql `
+              -MySqlHost 127.0.0.1 `
+              -CurlClient curl
+          } catch {
+            $message = $_.Exception.Message.Replace("`r", ' ').Replace("`n", ' ')
+            Write-Output "::error title=EMC integration workflow failed::$message"
+            throw
+          }
 
       - name: Show API log after failure
         if: failure()

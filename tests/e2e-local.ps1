@@ -64,6 +64,7 @@ try {
   $adminCheck = Invoke-JsonApi 'GET' '/admin/auth/session' $adminSession
   Assert-True $adminCheck.data.authenticated 'Admin session persists.'
   $adminCsrf = $adminCheck.data.csrfToken
+  Write-Output 'PASS phase=admin-authentication'
 
   $settings = Invoke-JsonApi 'GET' '/admin/settings' $adminSession
   $originalPickupFee = [int]$settings.data.pickupFeeKs
@@ -88,6 +89,7 @@ try {
   $adminCsrf = $updatedPackage.data.csrfToken
   $archivedPackage = Invoke-JsonApi 'DELETE' "/admin/packages/$testPackageId" $adminSession $null $adminCsrf
   $adminCsrf = $archivedPackage.data.csrfToken
+  Write-Output 'PASS phase=package-and-settings-management'
 
   $customerSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $phone = '099' + (Get-Random -Minimum 1000000 -Maximum 9999999)
@@ -102,6 +104,7 @@ try {
   $customerCheck = Invoke-JsonApi 'GET' '/auth/session' $customerSession
   Assert-True ($customerCheck.data.authenticated -and [int]$customerCheck.data.customer.id -eq $customerId) 'Remembered customer session restores the same account.'
   $customerCsrf = $customerCheck.data.csrfToken
+  Write-Output 'PASS phase=remembered-customer-authentication'
 
   $packages = Invoke-JsonApi 'GET' '/packages' $customerSession
   $package = $packages.data.packages | Select-Object -First 1
@@ -139,6 +142,7 @@ try {
   $dropoffOrderId = [int]$dropoffOrder.data.order.id
   $customerCsrf = $dropoffOrder.data.csrfToken
   Assert-True ([int]$dropoffOrder.data.order.pickupFeeKs -eq 0) 'Drop-off order does not include the optional pickup fee.'
+  Write-Output 'PASS phase=order-creation-and-retry'
 
   $adminOrder = Invoke-JsonApi 'GET' "/admin/orders/$orderId" $adminSession
   Assert-True ([int]$adminOrder.data.order.photoCount -eq 10) 'Admin can view all ten order photos.'
@@ -174,6 +178,7 @@ try {
   $customerPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $customerSession -UseBasicParsing
   Assert-True ($customerPhoto.StatusCode -eq 200) 'Owning customer can retrieve the private photo.'
   Assert-True ($customerPhoto.Headers['Cache-Control'] -match 'no-store') 'Owning-customer photo responses remain non-cacheable.'
+  Write-Output 'PASS phase=status-history-and-private-photos'
 
   $otherSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $otherPhone = '098' + (Get-Random -Minimum 1000000 -Maximum 9999999)
@@ -195,6 +200,7 @@ try {
     $accessRejected = ([int]$_.Exception.Response.StatusCode -eq 404)
   }
   Assert-True $accessRejected 'A different customer cannot retrieve the private photo.'
+  Write-Output 'PASS phase=cross-account-access-denial'
 
   $seen = Invoke-JsonApi 'POST' "/orders/$orderId/seen" $customerSession $null $customerCsrf
   $customerCsrf = $seen.data.csrfToken
@@ -204,6 +210,7 @@ try {
   $seenOrder = $afterSeen.data.orders | Where-Object { [int]$_.id -eq $orderId }
   $seenDropoff = $afterSeen.data.orders | Where-Object { [int]$_.id -eq $dropoffOrderId }
   Assert-True (-not $seenOrder.unreadStatus -and -not $seenDropoff.unreadStatus) 'Customer can mark both status histories as read.'
+  Write-Output 'PASS phase=unread-status-tracking'
 
   $restoredSettings = Invoke-JsonApi 'PUT' '/admin/settings' $adminSession @{ pickupFeeKs = $originalPickupFee } $adminCsrf
   $adminCsrf = $restoredSettings.data.csrfToken
