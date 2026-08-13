@@ -1,97 +1,145 @@
-# EMC production deployment
+# EMC Hostinger shared-hosting deployment
 
-This guide deploys the React build with the plain PHP API and MySQL. Use a staging site first. The public site and API must share the same HTTPS origin.
+This release supports a domain root or any nested folder, for example `https://example.com/emc`, without rebuilding. Keep the Git checkout outside `public_html`; deploy the committed `dist` package into the chosen public folder after each SSH pull.
 
-## 1. Hosting requirements
+## 1. Hostinger requirements
 
-- Apache 2.4 with `mod_rewrite` and `mod_headers`
 - PHP 8.2 or newer with PDO MySQL, mbstring, fileinfo, and OpenSSL
-- MySQL 8 or MariaDB 10.6 or newer with `utf8mb4`
-- HTTPS certificate with automatic renewal
-- A scheduled-task facility for backups and photo retention
-- A private, encrypted backup destination outside the web root
+- MySQL 8 or compatible MariaDB with `utf8mb4`
+- Apache `.htaccess` support (`mod_rewrite` and `mod_headers`)
+- HTTPS enabled for the domain
+- SSH access for `git pull`, migrations, administrator setup, and deployment
+- Cron access for backups and approved photo retention
 
-Node.js is only required to build the React files; it is not required on the live server.
+Node.js is not required on the hosting account. The production React files and PHP deployment package are committed under `dist` and verified by GitHub Actions.
 
-## 2. Database
+## 2. Clone privately and choose a public folder
 
-Create a dedicated database and migration account, then import every file in `database/migrations` in numeric order. Create a separate runtime account with only the permissions the application needs:
+In SSH, use `pwd` to confirm your account paths. Clone the source somewhere outside the web root:
 
-```sql
-CREATE USER 'emc_app'@'localhost' IDENTIFIED BY 'replace-with-a-long-random-password';
-GRANT SELECT, INSERT, UPDATE, DELETE ON emc_shoes_care.* TO 'emc_app'@'localhost';
-FLUSH PRIVILEGES;
+```bash
+cd ~
+git clone https://github.com/minhtetkyawpublic/emcshoescare.git
+cd emcshoescare
+git pull --ff-only origin main
 ```
 
-Do not run the application as MySQL `root`. Keep schema-changing permissions on the migration account only.
+Run `php -v` in SSH and select Hostinger's PHP 8.2+ CLI binary if the default differs from the website's configured version.
 
-## 3. Build and upload
-
-Run `npm ci`, `npm run lint`, and `npm run build` from a clean checkout. The public document root should contain:
+Choose the actual Hostinger public path shown for the website in hPanel. These are examples only:
 
 ```text
-index.html
-assets/
-manifest.webmanifest
-sw.js and PWA image/offline assets
-.htaccess
-api/
-storage/.htaccess
-storage/order-photos/
+/home/account/domains/example.com/public_html
+/home/account/domains/example.com/public_html/emc
+/home/account/domains/example.com/public_html/projects/shoe-care
 ```
 
-Copy the contents of `dist`, the repository root `.htaccess`, `api`, and `storage`. Do not publish `src`, `database`, `.git`, `.env.example`, tests, documentation, backups, or package files. Give the web-server account write permission only to `storage/order-photos`; application code should be read-only.
+Deploy to that exact folder:
 
-## 4. Server environment
+```bash
+php scripts/deploy-release.php /absolute/path/to/public_html/emc
+```
 
-Set these outside the document root in the Apache virtual host or hosting control panel:
+The command creates missing subfolders and copies the complete `dist` package. It never deletes the target’s `api/config.local.php` or `storage/order-photos` contents. The package includes subfolder-safe relative assets, PHP API, protected migrations, PWA files, and Apache rules.
+
+Do not point the web server at the repository root: it contains source and development files. Only the selected deployment target should be public.
+
+## 3. Create the Hostinger database
+
+Create a MySQL database and database user in hPanel, assign the user to that database, and retain the displayed database host/name/user/password. The migrations intentionally do not issue `CREATE DATABASE` or `USE`, because shared-host database names are controlled by hPanel.
+
+In the deployed public folder, create the ignored local configuration:
+
+```bash
+cd /absolute/path/to/public_html/emc
+cp api/config.production.example.php api/config.local.php
+php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'
+nano api/config.local.php
+```
+
+Put the generated key, final HTTPS origin, and hPanel database values in `config.local.php`. `allowed_origins` contains only scheme and host—never the installation folder:
+
+```php
+'allowed_origins' => ['https://example.com'],
+```
+
+The cookie path is detected automatically from the deployed folder. Set `cookie_path` explicitly only if Hostinger uses an unusual proxy mapping; valid examples are `/`, `/emc/`, or `/projects/shoe-care/`.
+
+Protect the configuration as mode `600` where the hosting setup permits it:
+
+```bash
+chmod 600 api/config.local.php
+chmod 750 storage/order-photos
+```
+
+The included Apache rules deny configuration, CLI, migration, source, and private-photo paths over HTTP.
+
+## 4. Run database migrations
+
+Preview and apply the idempotent migrations over SSH:
+
+```bash
+php api/cli/migrate.php --dry-run
+php api/cli/migrate.php
+php api/cli/migrate.php --status
+```
+
+The runner obtains a database lock, applies only pending numeric migrations, and records each completed version in `schema_migrations`. Running it again is safe and prints `Database is up to date.` A failed migration exits nonzero; do not continue deployment until its cause is corrected.
+
+Create or reset the one administrator after migrations:
+
+```bash
+php api/cli/create-admin.php emcadmin 'replace-with-a-long-unique-password' 'EMC Administrator'
+```
+
+Shell history can retain command arguments. A safer option is to set `EMC_ADMIN_USER`, `EMC_ADMIN_PASSWORD`, and `EMC_ADMIN_NAME` temporarily, run the command without arguments, and then unset them.
+
+## 5. PHP and upload settings
+
+Configure the site’s PHP version and limits in hPanel or the supported per-directory PHP configuration:
 
 ```text
-EMC_APP_ENV=production
-EMC_APP_KEY=<at least 32 random characters>
-EMC_DB_HOST=127.0.0.1
-EMC_DB_PORT=3306
-EMC_DB_NAME=emc_shoes_care
-EMC_DB_USER=emc_app
-EMC_DB_PASS=<database password>
-EMC_ALLOWED_ORIGINS=https://your-real-domain.example
-EMC_COOKIE_NAME=emc_session
-EMC_ADMIN_COOKIE_NAME=emc_admin_session
-EMC_COOKIE_PATH=/
-EMC_SESSION_DAYS=30
-EMC_UPLOAD_MAX_BYTES=5242880
-EMC_ORDER_PHOTO_RETENTION_DAYS=0
+upload_max_filesize = 6M
+post_max_size = 55M
+max_file_uploads = 10
+memory_limit = 256M
+max_execution_time = 120
 ```
 
-For an app installed in a subdirectory, set `EMC_COOKIE_PATH` to that path with a trailing slash. Keep photo retention at `0` until EMC approves its privacy policy and retention period. Production startup intentionally fails for a weak app key, a root/passwordless database account, or an HTTP allowed origin.
+The frontend compresses photos before upload. The API independently accepts one to ten valid JPG, PNG, or WebP images, each no larger than the configured 5 MB limit.
 
-Set PHP `upload_max_filesize` to at least `6M`, `post_max_size` to at least `55M`, and `max_file_uploads` to at least `10`. The application itself accepts no more than ten compressed files of 5 MB each.
+## 6. First production smoke test
 
-## 5. HTTPS and headers
+Replace the example origin/folder below with the real URL:
 
-Redirect all HTTP traffic to HTTPS. Once HTTPS is confirmed, add this in the TLS virtual host:
+1. Open `https://example.com/emc/api/health`; it must return an EMC API success response.
+2. Open the customer page and `/emc/admin`; both must load without missing assets.
+3. Confirm `/emc/admin/` canonicalizes to `/emc/admin`.
+4. Confirm `database/migrations/...`, `api/config.local.php`, `api/cli/migrate.php`, and `storage/order-photos` cannot be downloaded.
+5. Register, close/reopen the browser with **Remember me**, and confirm the session persists.
+6. Submit pickup and drop-off orders with photos and complete the administrator status workflow.
+7. Install from Android Chrome and iOS Safari and confirm the icon/name are EMC.
 
-```apache
-Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+Record results in `docs/ACCEPTANCE_TEST.md` and `RELEASE_CHECKLIST.md`.
+
+## 7. Updating from GitHub
+
+Take a verified database/photo backup before every update, then run from the private checkout:
+
+```bash
+git status --short
+git pull --ff-only origin main
+php scripts/deploy-release.php /absolute/path/to/public_html/emc
+cd /absolute/path/to/public_html/emc
+php api/cli/migrate.php --dry-run
+php api/cli/migrate.php
+php api/cli/migrate.php --status
 ```
 
-Only add `includeSubDomains` when every subdomain supports HTTPS. The included `.htaccess` already supplies CSP, clickjacking, MIME-sniffing, referrer, permissions, SPA-routing, and service-worker cache headers.
+The deployment command does not delete old hashed assets. They are harmless and allow safe rollback; periodically remove only assets proven unused by the current and retained rollback builds.
 
-## 6. Administrator and smoke check
+## 8. Backups, cron, and rollback
 
-Create the single administrator from the command line with `api/cli/create-admin.php`. Do not paste the password into tickets or source control.
+Configure the commands in `docs/OPERATIONS.md` with absolute Hostinger paths. Store encrypted backups outside `public_html` and preferably off-account. Keep photo cleanup disabled until EMC approves a retention period.
 
-On staging, confirm:
-
-1. `/api/health` returns API version 5 or newer.
-2. Customer registration, remembered login, order creation, and private photo viewing work.
-3. The administrator can update every valid pickup and drop-off status with bilingual notes.
-4. Another customer cannot access the order or photo URL.
-5. The manifest and service worker load with correct MIME types over HTTPS.
-6. Installation works from Android Chrome and iOS Safari.
-
-Use `RELEASE_CHECKLIST.md` for the final approval record.
-
-## 7. Rollback
-
-Before every release, take a verified database/photo backup and retain the previous application build. To roll back, place the site in maintenance mode, restore the matching database and photo snapshot when the schema changed, restore the previous build/API, clear only the `emc-` service-worker caches through a versioned worker, and run the smoke check again.
+For rollback, place the site in maintenance mode, restore the previous public package, and restore the matching database/photo backup if the schema or data changed. Then repeat the smoke test. Never roll database structure backward by manually deleting tables or migration records.

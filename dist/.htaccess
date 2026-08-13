@@ -3,9 +3,6 @@ AddType application/manifest+json .webmanifest
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(?:src|docs|database|scripts|tests|node_modules|backups|\.git|\.github)(?:/|$) - [F,L,NC]
-  RewriteRule ^api/(?:cli|lib)(?:/|$) - [F,L,NC]
-  RewriteRule ^api/(?:bootstrap|config(?:\.local|\.production\.example)?)\.php$ - [F,L,NC]
   RewriteRule ^admin/$ admin [R=308,L,NE]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
@@ -24,6 +21,6 @@ AddType application/manifest+json .webmanifest
   </Files>
 </IfModule>
 
-<FilesMatch "^(\.env|\.release\.json|composer\.(json|lock)|package(-lock)?\.json)$">
+<Files ".release.json">
   Require all denied
-</FilesMatch>
+</Files>

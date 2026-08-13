@@ -13,10 +13,17 @@ Last local verification: 2026-08-14 on the project XAMPP environment.
 - PWA identity, manifest, regular/maskable/Apple icon dimensions
 - service-worker exclusion of API and non-GET traffic
 - authenticated private-photo responses use `no-store`
+- arbitrary nested-folder cookie/API routing and root-relative asset rejection
+- exact source-to-`dist` API/migration/Apache-rule parity
+- production rejection of shipped app-key, database, and origin placeholders
 - required migration and release-document presence
 - Git whitespace validation
 
 `npm audit --omit=dev` reported zero known vulnerabilities during this Phase 6 verification.
+
+The committed `1.0.0-rc.1` shared-host package was deployed into a multi-level local Apache path. The customer page, `/admin`, API health, hashed assets, and PWA manifest returned successfully; `/admin/` canonicalized with HTTP 308; configuration, CLI, packaged migration, release metadata, and private-photo paths returned 403/404. A second deployment preserved an existing `api/config.local.php` and uploaded-photo sentinel byte-for-byte.
+
+The CLI migration runner was also exercised against a new isolated database from both the source checkout and packaged `dist` tree. Dry-run listed four pending versions, migrate created 11 tables/three seed packages and recorded all four versions, status showed each applied, and a repeated migrate reported the database up to date.
 
 ## Full local API workflow
 
@@ -37,7 +44,7 @@ Last local verification: 2026-08-14 on the project XAMPP environment.
 
 After the run, customers, orders, photos, histories, customer sessions, and admin sessions were all zero; the one real administrator and three seed packages remained.
 
-The same database-backed workflow is now a required GitHub Actions job. It starts a clean MySQL 8.4 service and PHP 8.2 API on an Ubuntu runner, imports every migration, creates an ephemeral administrator, and runs the portable PowerShell test. This complements the separate Windows static-release job and catches platform-specific PHP/MySQL regressions on every push and pull request.
+The same database-backed workflow is now a required GitHub Actions job. It starts a clean MySQL 8.4 service and PHP 8.2 API on an Ubuntu runner, previews/applies/rechecks the CLI migrations, creates an ephemeral administrator, and runs the portable PowerShell test. This complements the separate Windows static-release job and catches platform-specific PHP/MySQL regressions on every push and pull request.
 
 ## Backup and retention
 

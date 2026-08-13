@@ -1,11 +1,11 @@
 {
   "name": "emc-shoes-care",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/package-release.mjs",
     "preview": "vite preview",
     "lint": "eslint src"
   },

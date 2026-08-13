@@ -85,7 +85,7 @@ Acceptance: the production site meets installability requirements and remains cl
 
 ## Phase 6 — Release preparation
 
-Status: **In progress; automated release checks and operations tooling are being completed. Real shop content, device approval, hosting, and backup scheduling remain launch gates.**
+Status: **Release candidate `1.0.0-rc.1` is packaged for arbitrary-folder Hostinger deployment with SSH migration tooling. Real shop content, physical-device approval, production configuration, and backup scheduling remain launch gates.**
 
 - Full bilingual copy review
 - End-to-end testing of registration, order submission, photos, admin actions, and status history

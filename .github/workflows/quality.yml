@@ -48,12 +48,19 @@ jobs:
     name: PHP and MySQL order workflow
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      EMC_DB_HOST: 127.0.0.1
+      EMC_DB_PORT: 3306
+      EMC_DB_NAME: emc_shoes_care
+      EMC_DB_USER: root
+      EMC_DB_PASS: ''
 
     services:
       mysql:
         image: mysql:8.4
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: emc_shoes_care
         ports:
           - 3306:3306
         options: >-
@@ -73,12 +80,13 @@ jobs:
           extensions: mbstring, fileinfo, pdo_mysql
           coverage: none
 
-      - name: Import database migrations
-        shell: bash
+      - name: Run database migrations
+        shell: pwsh
         run: |
-          for migration in database/migrations/*.sql; do
-            docker exec -i "${{ job.services.mysql.id }}" mysql --user=root < "$migration"
-          done
+          php api/cli/migrate.php --dry-run
+          php api/cli/migrate.php
+          php api/cli/migrate.php --status
+          php api/cli/migrate.php
 
       - name: Create temporary administrator and start API
         shell: bash

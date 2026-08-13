@@ -2,7 +2,9 @@
 
 ## Backups
 
-Run `scripts/backup.ps1` every day from a restricted server account. It creates one ZIP containing a transaction-consistent MySQL dump, private order photos, metadata, and a separate SHA-256 checksum. Its Windows default is the service account's local application-data directory, outside this web project; pass `-BackupRoot` to select the approved encrypted off-site/synchronised destination. For password-protected MySQL, pass a locked-down MySQL option file with `-DefaultsExtraFile`; do not put the password in a scheduled-task command.
+For local Windows/XAMPP recovery drills, run `scripts/backup.ps1` from a restricted account. It creates one ZIP containing a transaction-consistent MySQL dump, private order photos, metadata, and a separate SHA-256 checksum. Pass `-BackupRoot` for an approved encrypted destination and a locked-down MySQL option file with `-DefaultsExtraFile`; never put a password in a scheduled-task command.
+
+On Hostinger, use the hosting account's supported database/file backup facilities and confirm that both the configured EMC database and the deployed `storage/order-photos` directory are included. Download or replicate backups to encrypted off-account storage; a backup stored only on the same hosting account is not sufficient disaster recovery. Record the exact hPanel/cron procedure, retention, last successful run, and restore evidence in `docs/ACCEPTANCE_TEST.md`.
 
 Keep backups outside the web root on encrypted storage. A practical starting schedule is seven daily, five weekly, and twelve monthly copies, but EMC and the hosting provider must approve the final schedule. Alert when a backup fails or its size unexpectedly drops. Verify the checksum after every transfer and perform a restoration drill into an isolated database at least monthly.
 
@@ -34,6 +36,13 @@ php api/cli/purge-order-photos.php --days=180 --execute
 ```
 
 The minimum is 30 days. Schedule execution only after EMC publishes and approves the same period in its privacy wording. Set `EMC_ORDER_PHOTO_RETENTION_DAYS` so scheduled runs do not depend on an undocumented value. Investigate any non-zero `failures` result.
+
+For Hostinger cron, use the deployed absolute path and verify the CLI PHP version first, for example:
+
+```text
+php -v
+php /absolute/path/to/public_html/emc/api/cli/purge-order-photos.php --days=180 --execute
+```
 
 ## Routine administration
 

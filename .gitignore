@@ -41,7 +41,10 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
-/dist/
+# The production-ready shared-hosting package is committed so an SSH pull can deploy without Node.js.
+/dist/api/config.local.php
+/dist/storage/order-photos/*
+!/dist/storage/order-photos/.gitkeep
 /.wrangler/
 /outputs/
 /work/

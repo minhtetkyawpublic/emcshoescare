@@ -21,6 +21,9 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 - [x] Tested database/photo backup command with checksum
 - [x] Dry-run-first terminal-order photo-retention command
 - [x] Deployment, operations, and staff/customer handover guides
+- [x] SSH-ready `dist` package deployable at a domain root or arbitrary nested folder
+- [x] Locked, idempotent CLI migration runner verified on fresh MySQL and repeated runs
+- [x] Production startup rejects every shipped key, database, and origin placeholder
 
 ## Required business inputs
 
@@ -33,7 +36,7 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 
 - [ ] Production domain and HTTPS certificate configured
 - [ ] Dedicated non-root MySQL runtime account and production app key configured
-- [ ] All migrations imported and single administrator created securely
+- [ ] CLI migration status shows all migrations applied and single administrator created securely
 - [ ] Private photo directory permissions and direct-access denial verified
 - [ ] Daily off-site encrypted backup schedule enabled and monitored
 - [x] A local backup restored successfully into an isolated scratch database and matched expected tables/migrations/data
