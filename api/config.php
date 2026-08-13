@@ -29,6 +29,7 @@ return array_replace_recursive([
         'session_days' => max(1, (int) emc_env('EMC_SESSION_DAYS', '30')),
         'admin_cookie_name' => emc_env('EMC_ADMIN_COOKIE_NAME', 'emc_admin_session'),
         'upload_max_bytes' => max(1048576, (int) emc_env('EMC_UPLOAD_MAX_BYTES', '5242880')),
+        'order_photo_retention_days' => max(0, (int) emc_env('EMC_ORDER_PHOTO_RETENTION_DAYS', '0')),
         'order_photo_path' => dirname(__DIR__) . '/storage/order-photos',
     ],
     'database' => [

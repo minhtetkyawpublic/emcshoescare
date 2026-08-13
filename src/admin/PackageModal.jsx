@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, Check, X } from "lucide-react";
 import { adminApi } from "../api/adminClient";
+import useDialogFocus from "../components/useDialogFocus";
 
 function PackageModal({ packageItem, t, onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
@@ -8,16 +9,7 @@ function PackageModal({ packageItem, t, onClose, onSaved }) {
   const editing = Boolean(packageItem);
   const dialogRef = useRef(null);
 
-  useEffect(() => {
-    const closeOnEscape = (event) => event.key === "Escape" && !busy && onClose();
-    document.body.classList.add("modal-open");
-    window.addEventListener("keydown", closeOnEscape);
-    dialogRef.current?.focus();
-    return () => {
-      document.body.classList.remove("modal-open");
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [busy, onClose]);
+  useDialogFocus(dialogRef, onClose, busy);
 
   const submit = async (event) => {
     event.preventDefault();

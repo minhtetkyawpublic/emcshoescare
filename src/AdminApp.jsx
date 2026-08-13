@@ -125,7 +125,7 @@ function AdminApp() {
       </aside>
       {menuOpen && <button className="admin-sidebar-shade" onClick={() => setMenuOpen(false)} aria-label={t.close} />}
       <main className="admin-main">
-        <header className="admin-topbar"><button className="admin-menu" onClick={() => setMenuOpen(true)} aria-label="Menu"><Menu /></button><div><span>{t.adminPortal}</span><strong>{t.dashboard}</strong></div><div><button onClick={() => setLanguage(language === "en" ? "mm" : "en")}><Languages />{t.languageName}</button><button onClick={loadDashboard} disabled={loading} aria-label={t.refresh}><RefreshCw className={loading ? "spinning" : ""} /></button></div></header>
+        <header className="admin-topbar"><button className="admin-menu" onClick={() => setMenuOpen(true)} aria-label={t.menu}><Menu /></button><div><span>{t.adminPortal}</span><strong>{t.dashboard}</strong></div><div><button onClick={() => setLanguage(language === "en" ? "mm" : "en")}><Languages />{t.languageName}</button><button onClick={loadDashboard} disabled={loading} aria-label={t.refresh}><RefreshCw className={loading ? "spinning" : ""} /></button></div></header>
         <div className="admin-content">
           <div className="admin-welcome"><div><p>{t.welcomeAdmin}, {admin.displayName}</p><h1>{tab === "orders" ? t.adminOrders : tab === "packages" ? t.adminPackages : t.adminSettings}</h1></div>{tab === "packages" && <button className="admin-primary" onClick={() => setPackageModal(null)}><PackagePlus />{t.createPackage}</button>}</div>
           {error && <p className="admin-error page-message" role="alert">{error}</p>}

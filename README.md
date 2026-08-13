@@ -4,6 +4,9 @@ Mobile-first React Progressive Web App for EMC Shoes Care Myanmar. The planned p
 
 Phase 1 contains the bilingual public landing page. Phase 2 adds phone/password customer accounts. Phase 3 adds the admin dashboard, database-managed packages, optional pickup fees, real orders, private photo storage, and customer order history. Phase 4 adds guarded status transitions, bilingual admin notes, customer timelines, and unread in-app updates. Phase 5 completes the installable PWA experience, safe offline fallback, recoverable uploads, and production hardening. The backend remains plain PHP and MySQL. See [ROADMAP.md](./ROADMAP.md) for the full delivery plan.
 
+Phase 6 release preparation is tracked in [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md). Production setup, backup/retention operations, and staff/customer instructions are in `docs/`.
+The real shop details, packages, and privacy wording can be supplied with `docs/CONTENT_WORKSHEET.md` before the final release.
+
 ## Run locally
 
 ```bash
@@ -49,5 +52,15 @@ The included Apache rules provide SPA routing, disable directory listings, deny 
 npm run lint
 npm run build
 ```
+
+On Windows/XAMPP, `scripts/release-check.ps1` repeats lint, build, PHP syntax, translation parity, PWA icon/manifest, private-cache, documentation, and whitespace checks.
+
+With local XAMPP Apache/MySQL running and the local administrator configured, the complete API workflow can be repeated with:
+
+```powershell
+.\tests\e2e-local.ps1 -AdminPassword '<local-admin-password>'
+```
+
+The test restores the pickup fee and removes its temporary customers, order, package, sessions, and photo. Never run this local cleanup test against production.
 
 The interface text for both English and Myanmar is kept in `src/i18n/translations.js`. Phase 1 package names and demonstration prices are also defined there for easy replacement.

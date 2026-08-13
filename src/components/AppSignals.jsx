@@ -1,24 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, RefreshCw, Share2, WifiOff, X } from "lucide-react";
+import useDialogFocus from "./useDialogFocus";
 
 function InstallGuide({ open, onClose, onInstall, canPrompt, installed, t }) {
-  const closeButton = useRef(null);
+  const dialogRef = useRef(null);
   const userAgent = navigator.userAgent || "";
   const isIos = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
 
-  useEffect(() => {
-    if (!open) return undefined;
-    closeButton.current?.focus();
-    const closeOnEscape = (event) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [open, onClose]);
-
   if (!open) return null;
+  return <OpenInstallGuide dialogRef={dialogRef} onClose={onClose} onInstall={onInstall} canPrompt={canPrompt} installed={installed} isIos={isIos} t={t} />;
+}
+
+function OpenInstallGuide({ dialogRef, onClose, onInstall, canPrompt, installed, isIos, t }) {
+  useDialogFocus(dialogRef, onClose);
   return (
     <div className="install-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="install-guide" role="dialog" aria-modal="true" aria-labelledby="install-title">
-        <button ref={closeButton} className="install-close" type="button" onClick={onClose} aria-label={t.close}><X /></button>
+      <section ref={dialogRef} className="install-guide" role="dialog" aria-modal="true" aria-labelledby="install-title" tabIndex="-1">
+        <button className="install-close" type="button" onClick={onClose} aria-label={t.close}><X /></button>
         <span className="install-mark"><img src="./icon-192.png" alt="" /></span>
         <h2 id="install-title">{installed ? t.alreadyInstalled : t.installTitle}</h2>
         <p>{installed ? t.alreadyInstalledBody : t.installIntro}</p>

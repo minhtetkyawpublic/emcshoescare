@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowRight, Box, CheckCircle2, Clock3, Image, MapPin, Phone, UserRound, X } from "lucide-react";
 import { adminApi } from "../api/adminClient";
 import { apiUrl } from "../api/client";
 import { localizedStatusNote, statusLabel } from "../orderStatus";
 import { adminDateTime, adminPrice } from "./utils";
+import useDialogFocus from "../components/useDialogFocus";
 
 function OrderModal({ order, language, t, onClose, onUpdated }) {
   const packageName = language === "mm" ? order.package.nameMm : order.package.nameEn;
@@ -13,16 +14,7 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
   const [noteMm, setNoteMm] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useEffect(() => {
-    const closeOnEscape = (event) => event.key === "Escape" && onClose();
-    document.body.classList.add("modal-open");
-    window.addEventListener("keydown", closeOnEscape);
-    dialogRef.current?.focus();
-    return () => {
-      document.body.classList.remove("modal-open");
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onClose]);
+  useDialogFocus(dialogRef, onClose, busy);
 
   const updateStatus = async (event) => {
     event.preventDefault();

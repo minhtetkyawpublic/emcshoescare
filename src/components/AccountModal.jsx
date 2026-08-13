@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3, Eye, EyeOff, Image, LockKeyhole, LogOut, Phone, ShieldCheck, UserRound, X } from "lucide-react";
 import { accountApi, apiUrl } from "../api/client";
 import { localizedStatusNote, statusLabel } from "../orderStatus";
+import useDialogFocus from "./useDialogFocus";
 
 function translatedError(error, t) {
   const messages = {
@@ -25,15 +26,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   const [ordersError, setOrdersError] = useState("");
   const modalRef = useRef(null);
 
-  useEffect(() => {
-    const closeOnEscape = (event) => event.key === "Escape" && !busy && onClose();
-    document.body.classList.add("modal-open");
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.classList.remove("modal-open");
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [busy, onClose]);
+  useDialogFocus(modalRef, onClose, busy, "[data-initial-focus]");
 
   useEffect(() => {
     modalRef.current?.querySelector("[data-initial-focus]")?.focus();
@@ -154,7 +147,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={closeFromBackdrop}>
-      <section ref={modalRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title">
+      <section ref={modalRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title" tabIndex="-1">
         <button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label={t.close}><X /></button>
         <div className="account-brand"><span><img src="./emcicon.jpg" alt="" /></span><strong>EMC</strong></div>
 

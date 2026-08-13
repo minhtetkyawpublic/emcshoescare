@@ -363,7 +363,7 @@ function App() {
       <header className="site-header">
         <div className="container header-inner">
           <button className="brand-button" onClick={() => scrollTo("top")} aria-label={t.brandName}><Logo /></button>
-          <nav className={menuOpen ? "desktop-nav open" : "desktop-nav"} aria-label="Main navigation">
+          <nav className={menuOpen ? "desktop-nav open" : "desktop-nav"} aria-label={t.mainNavigation}>
             <button onClick={() => scrollTo("services")}>{t.navServices}</button>
             <button onClick={() => scrollTo("process")}>{t.navProcess}</button>
             <button onClick={() => scrollTo("order")}>{t.navOrder}</button>
@@ -380,7 +380,7 @@ function App() {
             ) : (
               <button className="account-button" onClick={() => setAccountMode("login")}><UserRound size={16} /><strong>{t.signIn}</strong></button>
             )}
-            <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="Toggle menu">
+            <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label={t.toggleMenu}>
               {menuOpen ? <X /> : <Menu />}
             </button>
           </div>
