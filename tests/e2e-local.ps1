@@ -148,8 +148,10 @@ try {
   Assert-True ([int]$adminOrder.data.order.photoCount -eq 10) 'Admin can view all ten order photos.'
   $photoId = [int]$adminOrder.data.order.photos[0].id
   $adminPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $adminSession -UseBasicParsing
-  Assert-True ($adminPhoto.StatusCode -eq 200 -and $adminPhoto.Headers['Content-Type'] -eq 'image/png') 'Admin can retrieve the private photo.'
-  Assert-True ($adminPhoto.Headers['Cache-Control'] -match 'no-store') 'Private photo responses cannot be stored in browser caches.'
+  $adminPhotoContentType = ($adminPhoto.Headers['Content-Type'] -join ',')
+  $adminPhotoCacheControl = ($adminPhoto.Headers['Cache-Control'] -join ',')
+  Assert-True ($adminPhoto.StatusCode -eq 200 -and $adminPhotoContentType -match '^image/png(?:;|$)') 'Admin can retrieve the private photo.'
+  Assert-True ($adminPhotoCacheControl -match 'no-store') 'Private photo responses cannot be stored in browser caches.'
 
   foreach ($status in @('confirmed', 'pickup_scheduled', 'rider_on_way', 'shoes_received', 'repairing', 'ready', 'done')) {
     $statusResult = Invoke-JsonApi 'PUT' "/admin/orders/$orderId/status" $adminSession @{
@@ -177,7 +179,8 @@ try {
   Assert-True ($dropoffDetail.data.order.history.Count -eq 6) 'Drop-off timeline skips pickup and rider states.'
   $customerPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $customerSession -UseBasicParsing
   Assert-True ($customerPhoto.StatusCode -eq 200) 'Owning customer can retrieve the private photo.'
-  Assert-True ($customerPhoto.Headers['Cache-Control'] -match 'no-store') 'Owning-customer photo responses remain non-cacheable.'
+  $customerPhotoCacheControl = ($customerPhoto.Headers['Cache-Control'] -join ',')
+  Assert-True ($customerPhotoCacheControl -match 'no-store') 'Owning-customer photo responses remain non-cacheable.'
   Write-Output 'PASS phase=status-history-and-private-photos'
 
   $otherSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
