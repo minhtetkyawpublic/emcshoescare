@@ -5,6 +5,7 @@ param(
   [string]$BaseUrl = 'http://127.0.0.1/emcshoecare/api',
   [string]$MySqlBin = 'D:\xampp\mysql\bin',
   [string]$MySqlClient = '',
+  [string]$MySqlHost = '',
   [string]$CurlClient = '',
   [string]$PhotoPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'public\icon-192.png')
 )
@@ -28,6 +29,15 @@ $storageRecords = @()
 
 function Assert-True([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Assertion failed: $Message" }
+}
+
+function Invoke-TestMySql {
+  param([string[]]$ClientArguments)
+  $connectionArguments = @('-u', 'root')
+  if (-not [string]::IsNullOrWhiteSpace($MySqlHost)) {
+    $connectionArguments += @('--protocol=tcp', "--host=$MySqlHost")
+  }
+  return & $MySqlClient @connectionArguments @ClientArguments
 }
 
 function Invoke-JsonApi {
@@ -210,11 +220,11 @@ finally {
   $mysql = Get-Command $MySqlClient -ErrorAction SilentlyContinue
   if ($mysql) {
     if ($pickupFeeChanged) {
-      & $MySqlClient -u root -D emc_shoes_care -e "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';"
+      Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';") | Out-Null
     }
     $cleanupOrderIds = @($orderId, $dropoffOrderId) | Where-Object { $_ -gt 0 }
     foreach ($cleanupOrderId in $cleanupOrderIds) {
-      $photoRows = & $MySqlClient -u root -N -B -D emc_shoes_care -e "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;"
+      $photoRows = Invoke-TestMySql @('-N', '-B', '-D', 'emc_shoes_care', '-e', "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;")
       foreach ($photoRow in @($photoRows)) {
         if ($photoRow) {
           $parts = $photoRow -split "`t"
@@ -223,11 +233,11 @@ finally {
           }
         }
       }
-      & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM orders WHERE id=$cleanupOrderId;"
+      Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM orders WHERE id=$cleanupOrderId;") | Out-Null
     }
-    if ($testPackageId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM packages WHERE id=$testPackageId;" }
-    if ($customerId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$customerId; DELETE FROM customers WHERE id=$customerId;" }
-    if ($otherCustomerId -gt 0) { & $MySqlClient -u root -D emc_shoes_care -e "DELETE FROM auth_sessions WHERE customer_id=$otherCustomerId; DELETE FROM customers WHERE id=$otherCustomerId;" }
+    if ($testPackageId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM packages WHERE id=$testPackageId;") | Out-Null }
+    if ($customerId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM auth_sessions WHERE customer_id=$customerId; DELETE FROM customers WHERE id=$customerId;") | Out-Null }
+    if ($otherCustomerId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM auth_sessions WHERE customer_id=$otherCustomerId; DELETE FROM customers WHERE id=$otherCustomerId;") | Out-Null }
   }
   foreach ($storageRecord in $storageRecords) {
     $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'storage\order-photos'))

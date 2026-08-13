@@ -103,6 +103,7 @@ jobs:
           -AdminPassword 'EMC-Release-Audit-2026!'
           -BaseUrl http://127.0.0.1:8080
           -MySqlClient mysql
+          -MySqlHost 127.0.0.1
           -CurlClient curl
 
       - name: Show API log after failure
