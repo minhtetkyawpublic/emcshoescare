@@ -64,6 +64,9 @@ class ApiWorkflowTest extends TestCase
         foreach (['confirmed', 'pickup_scheduled', 'rider_on_way', 'shoes_received', 'repairing', 'ready', 'done'] as $status) {
             $this->withHeader('X-CSRF-TOKEN', session()->token())->putJson("/admin/orders/{$orderId}/status", ['status' => $status, 'noteEn' => "Changed to {$status}"])->assertOk()->assertJsonPath('data.order.status', $status);
         }
+        $this->getJson('/orders')->assertOk()->assertJsonPath('data.orders.0.unreadStatus', true);
+        $this->postJson("/orders/{$orderId}/seen")->assertOk();
+        $this->getJson('/orders')->assertOk()->assertJsonPath('data.orders.0.unreadStatus', false);
         $this->get("/orders/{$orderId}/photos/1")->assertOk()->assertHeader('Cache-Control', 'no-store, private');
     }
 

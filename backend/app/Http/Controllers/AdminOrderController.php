@@ -48,7 +48,7 @@ class AdminOrderController extends ApiController
                 throw new ApiException('invalid_status_transition', 'That status change is not allowed for this order.', 409);
             }
             $previous = $record->status;
-            $record->update(['status' => $status]);
+            $record->update(['status' => $status, 'customer_seen_at' => null]);
             OrderStatusHistory::create(['order_id' => $record->id, 'from_status' => $previous, 'to_status' => $status, 'note_en' => $noteEn, 'note_mm' => $noteMm, 'changed_by_admin_id' => $admin->id, 'created_at' => now()]);
         });
         $updated = Order::findOrFail($order);
