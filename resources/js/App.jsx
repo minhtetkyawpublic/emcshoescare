@@ -4,7 +4,9 @@ import {
   Check,
   ChevronRight,
   CircleCheck,
+  ClipboardList,
   Clock3,
+  House,
   ImagePlus,
   Languages,
   Menu,
@@ -96,6 +98,7 @@ function Logo({ compact = false }) {
 function App() {
   const [language, setLanguage] = useState(() => localStorage.getItem("emc-language") || "en");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobilePage, setMobilePage] = useState("home");
   const [packages, setPackages] = useState(fallbackPackages);
   const [selectedPackage, setSelectedPackage] = useState(String(fallbackPackages[1]?.id || ""));
   const [pickupFee, setPickupFee] = useState(0);
@@ -118,12 +121,22 @@ function App() {
   const [clientRequestId, setClientRequestId] = useState(newRequestId);
   const [recoveredDraft, setRecoveredDraft] = useState(null);
   const fileInput = useRef(null);
+  const mainScroll = useRef(null);
   const t = translations[language];
 
   useEffect(() => {
     localStorage.setItem("emc-language", language);
     document.documentElement.lang = language === "mm" ? "my" : "en";
   }, [language]);
+
+  useEffect(() => {
+    document.documentElement.classList.add("customer-app-shell");
+    document.body.classList.add("customer-app-shell");
+    return () => {
+      document.documentElement.classList.remove("customer-app-shell");
+      document.body.classList.remove("customer-app-shell");
+    };
+  }, []);
 
   useEffect(() => {
     const handlePrompt = (event) => {
@@ -198,7 +211,24 @@ function App() {
     return () => { active = false; };
   }, []);
 
+  const openMobilePage = (page, targetId = null) => {
+    setMobilePage(page);
+    setMenuOpen(false);
+    window.requestAnimationFrame(() => {
+      if (targetId) {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        mainScroll.current?.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  };
+
   const scrollTo = (id) => {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      const page = id === "order" ? "order" : id === "process" ? "process" : id === "top" ? "home" : "services";
+      openMobilePage(page, id === "packages" ? "packages" : null);
+      return;
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setMenuOpen(false);
   };
@@ -390,15 +420,15 @@ function App() {
         </div>
       </header>
 
-      <main id="top">
+      <main id="top" className="app-main" ref={mainScroll}>
         {recoveredDraft && customer && Number(recoveredDraft.customerId) === Number(customer.id) && (
-          <aside className="draft-recovery" aria-live="polite">
+          <aside className={`draft-recovery mobile-page mobile-page-order ${mobilePage === "order" ? "mobile-active" : ""}`} aria-live="polite">
             <div><strong>{t.draftFoundTitle}</strong><span>{t.draftFoundBody}</span></div>
             <button type="button" onClick={restoreDraft}>{t.restoreDraft}</button>
             <button type="button" className="draft-discard" onClick={discardDraft}>{t.discardDraft}</button>
           </aside>
         )}
-        <section className="hero-section">
+        <section className={`hero-section mobile-page mobile-page-home ${mobilePage === "home" ? "mobile-active" : ""}`}>
           <div className="hero-glow hero-glow-one" />
           <div className="hero-glow hero-glow-two" />
           <div className="container hero-grid">
@@ -436,7 +466,7 @@ function App() {
           </div>
         </section>
 
-        <section className="section services-section" id="services">
+        <section className={`section services-section mobile-page mobile-page-services ${mobilePage === "services" ? "mobile-active" : ""}`} id="services">
           <div className="container">
             <div className="section-heading centered">
               <p className="eyebrow">{t.servicesEyebrow}</p>
@@ -458,7 +488,7 @@ function App() {
           </div>
         </section>
 
-        <section className="section packages-section" id="packages">
+        <section className={`section packages-section mobile-page mobile-page-services ${mobilePage === "services" ? "mobile-active" : ""}`} id="packages">
           <div className="container">
             <div className="section-heading split-heading">
               <div><p className="eyebrow">{t.packagesEyebrow}</p><h2>{t.packagesTitle}</h2></div>
@@ -487,7 +517,7 @@ function App() {
           </div>
         </section>
 
-        <section className="section process-section" id="process">
+        <section className={`section process-section mobile-page mobile-page-process ${mobilePage === "process" ? "mobile-active" : ""}`} id="process">
           <div className="container process-grid">
             <div className="process-intro">
               <p className="eyebrow">{t.processEyebrow}</p>
@@ -509,7 +539,7 @@ function App() {
           </div>
         </section>
 
-        <section className="section order-section" id="order">
+        <section className={`section order-section mobile-page mobile-page-order ${mobilePage === "order" ? "mobile-active" : ""}`} id="order">
           <div className="container order-layout">
             <div className="order-intro">
               <span className="demo-badge">{t.demoBadge}</span>
@@ -596,6 +626,20 @@ function App() {
           <span>{t.footerPhase}</span>
         </div>
       </footer>
+      <nav className="mobile-tabbar" aria-label={t.mainNavigation}>
+        <button type="button" className={mobilePage === "home" ? "active" : ""} onClick={() => openMobilePage("home")} aria-current={mobilePage === "home" ? "page" : undefined}>
+          <House /><span>{t.navHome}</span>
+        </button>
+        <button type="button" className={mobilePage === "services" ? "active" : ""} onClick={() => openMobilePage("services")} aria-current={mobilePage === "services" ? "page" : undefined}>
+          <PackageCheck /><span>{t.navServices}</span>
+        </button>
+        <button type="button" className={mobilePage === "process" ? "active" : ""} onClick={() => openMobilePage("process")} aria-label={t.navProcess} aria-current={mobilePage === "process" ? "page" : undefined}>
+          <Clock3 /><span>{t.navProcessShort}</span>
+        </button>
+        <button type="button" className={mobilePage === "order" ? "active" : ""} onClick={() => openMobilePage("order")} aria-label={t.navOrder} aria-current={mobilePage === "order" ? "page" : undefined}>
+          <ClipboardList /><span>{t.navOrderShort}</span>
+        </button>
+      </nav>
       {accountMode && (
         <AccountModal
           mode={accountMode}
