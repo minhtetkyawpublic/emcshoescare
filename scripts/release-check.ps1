@@ -83,10 +83,22 @@ try {
   $routes = (& php artisan route:list --json | ConvertFrom-Json)
   if (-not ($routes | Where-Object { $_.uri -eq 'api/health' }) -or -not ($routes | Where-Object { $_.name -eq 'spa' })) { throw 'Unified API or SPA routes are missing.' }
 
-  & php artisan optimize
-  if ($LASTEXITCODE -ne 0) { throw 'Laravel production optimization failed.' }
-  & php artisan optimize:clear
-  if ($LASTEXITCODE -ne 0) { throw 'Laravel optimization cleanup failed.' }
+  # A fresh CI checkout has no .env. Force a filesystem cache while exercising
+  # optimization so optimize:clear never depends on an un-migrated database.
+  $previousCacheStore = $env:CACHE_STORE
+  try {
+    $env:CACHE_STORE = 'file'
+    & php artisan optimize
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel production optimization failed.' }
+    & php artisan optimize:clear
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel optimization cleanup failed.' }
+  } finally {
+    if ($null -eq $previousCacheStore) {
+      Remove-Item Env:CACHE_STORE -ErrorAction SilentlyContinue
+    } else {
+      $env:CACHE_STORE = $previousCacheStore
+    }
+  }
 
   & git ls-files --error-unmatch public/build/manifest.json | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'The Hostinger-ready Vite build is not tracked by Git.' }
