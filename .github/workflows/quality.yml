@@ -44,7 +44,14 @@ jobs:
 
       - name: Run release checks
         shell: powershell
-        run: .\scripts\release-check.ps1
+        run: |
+          try {
+            .\scripts\release-check.ps1
+          } catch {
+            $message = $_.Exception.Message.Replace("`r", ' ').Replace("`n", ' ')
+            Write-Output "::error title=Laravel release checks failed::$message"
+            throw
+          }
 
   api-integration:
     name: Laravel and MySQL order workflow
