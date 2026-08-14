@@ -98,6 +98,12 @@ try {
   if ((Get-FileHash 'hosting\shared-hosting.htaccess').Hash -ne (Get-FileHash 'dist\.htaccess').Hash) { throw 'The deployed Apache rules are stale.' }
   if ((Get-FileHash 'hosting\laravel-api.htaccess').Hash -ne (Get-FileHash 'dist\api\.htaccess').Hash) { throw 'The deployed Laravel API rules are stale.' }
   if ((Get-FileHash 'hosting\laravel-api-index.php').Hash -ne (Get-FileHash 'dist\api\index.php').Hash) { throw 'The deployed Laravel API bridge is stale.' }
+  $publicRules = Get-Content dist\.htaccess -Raw
+  if (-not $publicRules.Contains('Anything else that physically exists belongs to the private checkout.') -or
+      -not $publicRules.Contains('RewriteRule ^ - [F,L]') -or
+      -not $publicRules.Contains('RewriteRule ^api(?:/|$) - [L,NC]')) {
+    throw 'The public package does not deny private files in a co-located checkout.'
+  }
 
   $deploymentAuditRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("emc-deploy-audit-" + [guid]::NewGuid().ToString('N'))
   $deploymentTarget = Join-Path $deploymentAuditRoot 'shared\projects\emc'

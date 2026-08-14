@@ -3,10 +3,21 @@ AddType application/manifest+json .webmanifest
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Public allowlist. This also permits a complete repository checkout to live
+  # in this directory without making Laravel, Git, source, or secrets readable.
+  RewriteRule ^$ index.html [L]
+  RewriteRule ^api(?:/|$) - [L,NC]
+  RewriteRule ^assets(?:/|$) - [L,NC]
+  RewriteRule ^(?:index\.html|offline\.html|offline\.css|manifest\.webmanifest|sw\.js|apple-touch-icon\.png|icon-192\.png|icon-512\.png|maskable-512\.png|emcicon\.jpg)$ - [L,NC]
+
+  # Anything else that physically exists belongs to the private checkout.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [F,L]
+
   RewriteCond %{REQUEST_URI} ^(.*)/admin/$
   RewriteRule ^admin/$ %1/admin [R=308,L,NE]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]
 </IfModule>
 
@@ -21,6 +32,10 @@ AddType application/manifest+json .webmanifest
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
   </Files>
 </IfModule>
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
 
 <Files ".release.json">
   Require all denied

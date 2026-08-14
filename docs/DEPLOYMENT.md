@@ -80,6 +80,24 @@ php backend/artisan optimize
 
 The command creates `api/runtime.php` with the absolute private Laravel path and protects it with Apache rules. It does not publish `.env`, `vendor`, migrations, or photos.
 
+### Complete checkout inside `public_html`
+
+Keeping the checkout outside `public_html` is preferred. When the hosting layout
+requires the complete repository to live in the public target, deploy to the
+repository root itself. The generated root `.htaccess` allows only the compiled
+frontend files, `assets/`, and `api/`; it returns HTTP 403 for every other real
+file or directory. This protection requires Apache `mod_rewrite` and `.htaccess`
+overrides, both of which must remain enabled.
+
+```bash
+cd /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
+php scripts/deploy-release.php "$PWD"
+```
+
+After deployment, verify that the application and health endpoint return 200,
+while `/backend/.env`, `/backend/artisan`, `/.git/config`, and `/package.json`
+return 403. Never continue with this layout if any private test URL is readable.
+
 ## 6. Test
 
 1. Open `https://k2softwarestudio.com/emcshoescare/api/health`; expect successful JSON naming `EMC Laravel API`.
