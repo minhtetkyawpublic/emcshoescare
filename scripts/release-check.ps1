@@ -16,7 +16,10 @@ try {
   try {
     & composer validate --strict --no-interaction
     if ($LASTEXITCODE -ne 0) { throw 'Laravel Composer metadata is invalid.' }
-    & composer audit --no-dev --no-interaction
+    # Composer writes the successful "No security vulnerability advisories found"
+    # message to stderr on some Windows installations. Route both streams through
+    # cmd so PowerShell 5 does not promote that message to a terminating error.
+    & cmd.exe /d /s /c "composer audit --no-dev --no-interaction 2>&1"
     if ($LASTEXITCODE -ne 0) { throw 'Laravel production dependency audit failed.' }
     & php vendor\bin\pint --test
     if ($LASTEXITCODE -ne 0) { throw 'Laravel formatting check failed.' }
