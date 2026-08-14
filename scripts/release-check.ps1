@@ -45,6 +45,8 @@ try {
 
   & node -e "import('./src/i18n/translations.js').then(({translations})=>{const en=Object.keys(translations.en),mm=Object.keys(translations.mm);if(en.length!==mm.length||en.some(k=>!(k in translations.mm))||mm.some(k=>!(k in translations.en)))process.exit(1)})"
   if ($LASTEXITCODE -ne 0) { throw 'English and Myanmar translation keys do not match.' }
+  & node -e "import('./src/api/baseUrl.js').then(({apiBaseFromModuleUrl:f})=>{const cases=[['https://example.com/assets/app.js','/api'],['https://example.com/emcshoescare/assets/app.js','/emcshoescare/api'],['https://example.com/clients/shoes/assets/app.js','/clients/shoes/api'],['http://localhost:5173/src/api/client.js','/api']];if(cases.some(([url,want])=>f(url)!==want))process.exit(1)})"
+  if ($LASTEXITCODE -ne 0) { throw 'Frontend API URLs are not portable across deployment directories.' }
 
   $manifest = Get-Content public\manifest.webmanifest -Raw | ConvertFrom-Json
   if ($manifest.short_name -ne 'EMC' -or $manifest.display -ne 'standalone') { throw 'PWA manifest identity is invalid.' }

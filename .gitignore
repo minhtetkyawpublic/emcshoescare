@@ -40,7 +40,6 @@ yarn-error.log*
 /backend/.env
 /backend/vendor/
 /backend/node_modules/
-/backend/public/build/
 
 # vercel
 .vercel

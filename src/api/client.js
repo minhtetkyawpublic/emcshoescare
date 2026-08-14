@@ -1,3 +1,5 @@
+import { apiBaseFromModuleUrl } from "./baseUrl";
+
 class ApiError extends Error {
   constructor(code, message, status, fields = {}) {
     super(message);
@@ -9,9 +11,7 @@ class ApiError extends Error {
 }
 
 let csrfToken = "";
-const API_BASE = import.meta.env.DEV
-  ? "/api"
-  : new URL(/* @vite-ignore */ "../api", import.meta.url).pathname.replace(/\/$/, "");
+const API_BASE = apiBaseFromModuleUrl(import.meta.url);
 
 export function apiUrl(path) {
   return `${API_BASE}${path}`;
