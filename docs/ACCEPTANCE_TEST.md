@@ -72,7 +72,7 @@ Notes or evidence links:
 - [ ] While offline, account/order/admin pages never show another person’s previously cached private data.
 - [ ] Sign in as a second customer and request the first customer’s order and photo URLs; both return Not Found.
 - [ ] Sign out and confirm authenticated order/photo URLs no longer open.
-- [ ] Direct browsing to `storage/order-photos` is denied.
+- [ ] Laravel `.env`, runtime-path file, migrations, Composer files, and private photos cannot be downloaded.
 
 Resilience/privacy result: PASS / FAIL
 
@@ -102,4 +102,3 @@ Every result above must be PASS and every checkbox complete before `v1.0.0`.
 - Deployment owner — name/signature/date:
 - Approved commit SHA:
 - Release decision: APPROVED / NOT APPROVED
-

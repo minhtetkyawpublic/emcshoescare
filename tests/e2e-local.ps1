@@ -6,6 +6,7 @@ param(
   [string]$MySqlBin = 'D:\xampp\mysql\bin',
   [string]$MySqlClient = '',
   [string]$MySqlHost = '',
+  [string]$DatabaseName = 'emc_shoes_care',
   [string]$CurlClient = '',
   [string]$PhotoPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'public\icon-192.png')
 )
@@ -59,7 +60,8 @@ function SessionCookieHeader($Session) {
 try {
   Assert-True (Test-Path -LiteralPath $PhotoPath) 'The test photo exists.'
   $adminSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-  $adminLogin = Invoke-JsonApi 'POST' '/admin/auth/login' $adminSession @{ username = $AdminUsername; password = $AdminPassword }
+  $adminBootstrap = Invoke-JsonApi 'GET' '/admin/auth/session' $adminSession
+  $adminLogin = Invoke-JsonApi 'POST' '/admin/auth/login' $adminSession @{ username = $AdminUsername; password = $AdminPassword } $adminBootstrap.data.csrfToken
   $adminCsrf = $adminLogin.data.csrfToken
   $adminCheck = Invoke-JsonApi 'GET' '/admin/auth/session' $adminSession
   Assert-True $adminCheck.data.authenticated 'Admin session persists.'
@@ -93,10 +95,11 @@ try {
 
   $customerSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $phone = '099' + (Get-Random -Minimum 1000000 -Maximum 9999999)
+  $customerBootstrap = Invoke-JsonApi 'GET' '/auth/session' $customerSession
   $registration = Invoke-JsonApi 'POST' '/auth/register' $customerSession @{
     phone = $phone; password = 'ReleaseTestPassword9'; fullName = 'Release Test Customer';
     address = 'Yangon release test address'; remember = $true
-  }
+  } $customerBootstrap.data.csrfToken
   $customerId = [int]$registration.data.customer.id
   $customerCsrf = $registration.data.csrfToken
   $rememberCookie = $customerSession.Cookies.GetCookies([Uri]$BaseUrl) | Select-Object -First 1
@@ -185,9 +188,10 @@ try {
 
   $otherSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $otherPhone = '098' + (Get-Random -Minimum 1000000 -Maximum 9999999)
+  $otherBootstrap = Invoke-JsonApi 'GET' '/auth/session' $otherSession
   $otherRegistration = Invoke-JsonApi 'POST' '/auth/register' $otherSession @{
     phone = $otherPhone; password = 'ReleaseTestPassword9'; fullName = 'Other Test Customer'; address = ''; remember = $false
-  }
+  } $otherBootstrap.data.csrfToken
   $otherCustomerId = [int]$otherRegistration.data.customer.id
   $orderAccessRejected = $false
   try {
@@ -230,11 +234,11 @@ finally {
   $mysql = Get-Command $MySqlClient -ErrorAction SilentlyContinue
   if ($mysql) {
     if ($pickupFeeChanged) {
-      Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';") | Out-Null
+      Invoke-TestMySql @('-D', $DatabaseName, '-e', "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';") | Out-Null
     }
     $cleanupOrderIds = @($orderId, $dropoffOrderId) | Where-Object { $_ -gt 0 }
     foreach ($cleanupOrderId in $cleanupOrderIds) {
-      $photoRows = Invoke-TestMySql @('-N', '-B', '-D', 'emc_shoes_care', '-e', "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;")
+      $photoRows = Invoke-TestMySql @('-N', '-B', '-D', $DatabaseName, '-e', "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;")
       foreach ($photoRow in @($photoRows)) {
         if ($photoRow) {
           $parts = $photoRow -split "`t"
@@ -243,14 +247,15 @@ finally {
           }
         }
       }
-      Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM orders WHERE id=$cleanupOrderId;") | Out-Null
+      Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM orders WHERE id=$cleanupOrderId;") | Out-Null
     }
-    if ($testPackageId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM packages WHERE id=$testPackageId;") | Out-Null }
-    if ($customerId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM auth_sessions WHERE customer_id=$customerId; DELETE FROM customers WHERE id=$customerId;") | Out-Null }
-    if ($otherCustomerId -gt 0) { Invoke-TestMySql @('-D', 'emc_shoes_care', '-e', "DELETE FROM auth_sessions WHERE customer_id=$otherCustomerId; DELETE FROM customers WHERE id=$otherCustomerId;") | Out-Null }
+    if ($testPackageId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM packages WHERE id=$testPackageId;") | Out-Null }
+    if ($customerId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM customers WHERE id=$customerId;") | Out-Null }
+    if ($otherCustomerId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM customers WHERE id=$otherCustomerId;") | Out-Null }
+    Invoke-TestMySql @('-D', $DatabaseName, '-e', 'DELETE FROM sessions;') | Out-Null
   }
   foreach ($storageRecord in $storageRecords) {
-    $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'storage\order-photos'))
+    $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'backend\storage\app\private\order-photos'))
     $directory = [System.IO.Path]::GetFullPath((Join-Path $root $storageRecord.StorageKey))
     $requiredPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
     if ($directory.StartsWith($requiredPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {

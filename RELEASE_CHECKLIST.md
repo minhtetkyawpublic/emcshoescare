@@ -6,7 +6,7 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 
 ## Implemented and automatically verified
 
-- [x] React customer/admin interfaces with plain PHP and MySQL
+- [x] React customer/admin interfaces with Laravel 12 and MySQL
 - [x] Phone/password registration and remembered login without OTP
 - [x] English/Myanmar copy stored together in `src/i18n/translations.js` with matching keys
 - [x] Fixed-price packages in Ks managed by the single administrator role
@@ -22,8 +22,8 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 - [x] Dry-run-first terminal-order photo-retention command
 - [x] Deployment, operations, and staff/customer handover guides
 - [x] SSH-ready `dist` package deployable at a domain root or arbitrary nested folder
-- [x] Locked, idempotent CLI migration runner verified on fresh MySQL and repeated runs
-- [x] Production startup rejects every shipped key, database, and origin placeholder
+- [x] Laravel Artisan migrations and seed data verified on fresh MySQL and repeated runs
+- [x] Private Laravel runtime, environment, migrations, Composer packages, and photos remain outside `public_html`
 
 ## Required business inputs
 

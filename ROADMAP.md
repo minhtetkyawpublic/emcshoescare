@@ -2,7 +2,7 @@
 
 ## Product decisions
 
-- Stack: React frontend, plain PHP REST API, and MySQL. No Laravel or other PHP framework.
+- Stack: React frontend, Laravel 12 JSON API, and MySQL.
 - Delivery: mobile-first Progressive Web App (PWA), installable from supported Android and iOS browsers.
 - Brand: **EMC Shoes Care Myanmar**; short/PWA name: **EMC**; app icon: `emcicon.jpg`.
 - Languages: English and Myanmar. All interface translations live in one editable frontend file.
@@ -30,17 +30,17 @@ Goal: deliver a polished customer-facing sales experience that demonstrates the 
 
 Acceptance: the page looks and works well on phone, tablet, and desktop; switches fully between English and Myanmar; the order form can be completed; image count/size rules are enforced; and the production build passes.
 
-## Phase 2 — Database, PHP API, and customer accounts
+## Phase 2 — Database, Laravel API, and customer accounts
 
 Status: **Implemented locally — pending customer UI review**
 
-- Define the MySQL schema and versioned SQL migrations
-- Create a small structured PHP API with configuration, routing, validation, and JSON responses
-- Secure phone-number/password registration and login (`password_hash` / `password_verify`)
-- Remembered login using secure, rotating server-side session tokens
+- Define the MySQL schema with Laravel Artisan migrations
+- Create a structured Laravel API with controllers, Eloquent models, validation, and JSON responses
+- Secure phone-number/password registration and login using Laravel hashing and guards
+- Remembered login using Laravel's encrypted server-side sessions
 - CSRF protection, rate limiting, input validation, and consistent API errors
 - Customer profile and saved address
-- Connect the React app to the PHP API
+- Connect the React app to the Laravel API
 - Add environment/configuration documentation for XAMPP and production hosting
 
 Acceptance: a customer can register, remain signed in, log out, and log back in securely on supported devices.
@@ -85,7 +85,7 @@ Acceptance: the production site meets installability requirements and remains cl
 
 ## Phase 6 — Release preparation
 
-Status: **Release candidate `1.0.0-rc.1` is packaged for arbitrary-folder Hostinger deployment with SSH migration tooling. Real shop content, physical-device approval, production configuration, and backup scheduling remain launch gates.**
+Status: **Release candidate `1.0.0-rc.2` uses a private Laravel 12 runtime and is packaged for arbitrary-folder Hostinger deployment. Real shop content, physical-device approval, production configuration, and backup scheduling remain launch gates.**
 
 - Full bilingual copy review
 - End-to-end testing of registration, order submission, photos, admin actions, and status history

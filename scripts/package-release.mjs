@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,17 +18,11 @@ function copy(source, destination, filter = undefined) {
   });
 }
 
+rmSync(join(releaseRoot, "api"), { recursive: true, force: true });
+rmSync(join(releaseRoot, "storage"), { recursive: true, force: true });
 copy("hosting/shared-hosting.htaccess", ".htaccess");
-copy("api", "api", (source) => !source.endsWith(`${sep}config.local.php`));
-copy("database/migrations", "api/cli/migrations");
-copy("storage/.htaccess", "storage/.htaccess");
-mkdirSync(join(releaseRoot, "storage/order-photos"), { recursive: true });
-writeFileSync(join(releaseRoot, "storage/order-photos/.gitkeep"), "", "utf8");
-
-// Remove files that should never be published if they survived a non-clean local copy.
-for (const forbidden of ["api/config.local.php", "storage/order-photos/.htaccess"]) {
-  rmSync(join(releaseRoot, forbidden), { force: true });
-}
+copy("hosting/laravel-api.htaccess", "api/.htaccess");
+copy("hosting/laravel-api-index.php", "api/index.php");
 
 writeFileSync(join(releaseRoot, ".release.json"), `${JSON.stringify({
   format: 1,
@@ -37,8 +31,9 @@ writeFileSync(join(releaseRoot, ".release.json"), `${JSON.stringify({
   version: packageMetadata.version,
   entrypoint: "index.html",
   api: "api/index.php",
-  migrations: "api/cli/migrations",
+  framework: "Laravel 12",
+  runtime: "private backend/ checkout",
+  migrations: "backend/database/migrations",
 }, null, 2)}\n`, "utf8");
 
-const packagedApi = relative(projectRoot, join(releaseRoot, "api")).replaceAll(sep, "/");
-process.stdout.write(`Packaged shared-hosting release in dist/ (${packagedApi}).\n`);
+process.stdout.write("Packaged shared-hosting release in dist/ with Laravel API bridge.\n");

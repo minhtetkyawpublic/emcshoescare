@@ -30,7 +30,6 @@ async function adminRequest(path, options = {}) {
 export const adminApi = {
   async session() {
     const data = await adminRequest("/admin/auth/session");
-    if (!data.authenticated) adminCsrfToken = "";
     return data;
   },
   login(credentials) {

@@ -49,7 +49,6 @@ async function request(path, options = {}) {
 export const accountApi = {
   async session() {
     const data = await request("/auth/session");
-    if (!data.authenticated) csrfToken = "";
     return data;
   },
   register(details) {

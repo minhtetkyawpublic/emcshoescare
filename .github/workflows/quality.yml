@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   release-static:
-    name: React, PHP, PWA, and release checks
+    name: React, Laravel, PWA, and release checks
     runs-on: windows-latest
     timeout-minutes: 15
 
@@ -38,22 +38,33 @@ jobs:
           coverage: none
 
       - name: Install locked dependencies
-        run: npm ci
+        run: |
+          npm ci
+          composer install --working-dir=backend --no-interaction --prefer-dist
 
       - name: Run release checks
         shell: powershell
         run: .\scripts\release-check.ps1
 
   api-integration:
-    name: PHP and MySQL order workflow
+    name: Laravel and MySQL order workflow
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      EMC_DB_HOST: 127.0.0.1
-      EMC_DB_PORT: 3306
-      EMC_DB_NAME: emc_shoes_care
-      EMC_DB_USER: root
-      EMC_DB_PASS: ''
+      APP_ENV: testing
+      APP_KEY: base64:aKaKq6c/SvWzglrYtL17pl0hG6/mC79yF/466Z7eEdE=
+      APP_DEBUG: 'false'
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: emc_shoes_care
+      DB_USERNAME: root
+      DB_PASSWORD: ''
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: 43200
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      EMC_ALLOWED_ORIGINS: http://127.0.0.1:8080
 
     services:
       mysql:
@@ -80,19 +91,21 @@ jobs:
           extensions: mbstring, fileinfo, pdo_mysql
           coverage: none
 
+      - name: Install locked Laravel dependencies
+        run: composer install --working-dir=backend --no-interaction --prefer-dist
+
       - name: Run database migrations
         shell: pwsh
         run: |
-          php api/cli/migrate.php --dry-run
-          php api/cli/migrate.php
-          php api/cli/migrate.php --status
-          php api/cli/migrate.php
+          php backend/artisan migrate --seed --force
+          php backend/artisan migrate:status
+          php backend/artisan migrate --force
 
       - name: Create temporary administrator and start API
         shell: bash
         run: |
-          php api/cli/create-admin.php emcaudit 'EMC-Release-Audit-2026!' 'Release Audit'
-          php -S 127.0.0.1:8080 api/index.php > "$RUNNER_TEMP/emc-api.log" 2>&1 &
+          php backend/artisan emc:create-admin emcaudit 'EMC-Release-Audit-2026!' 'Release Audit'
+          php backend/artisan serve --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/emc-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/emc-api.pid"
           for attempt in {1..20}; do
             if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then

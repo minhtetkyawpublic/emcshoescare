@@ -7,9 +7,11 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $source = realpath(dirname(__DIR__) . '/dist');
+$backend = realpath(dirname(__DIR__) . '/backend');
 $targetInput = trim((string) ($argv[1] ?? ''));
-if (!$source || !is_file($source . '/.release.json') || $targetInput === '') {
+if (!$source || !$backend || !is_file($source . '/.release.json') || !is_file($backend . '/vendor/autoload.php') || $targetInput === '') {
     fwrite(STDERR, "Usage: php scripts/deploy-release.php /absolute/path/to/public_html/optional-folder\n");
+    fwrite(STDERR, "Run composer install --working-dir=backend before deployment.\n");
     exit(1);
 }
 
@@ -51,13 +53,17 @@ function deployDirectory(string $source, string $target, int &$files): void
 try {
     $files = 0;
     deployDirectory($source, $target, $files);
-    $photoDirectory = $target . '/storage/order-photos';
-    if (!is_dir($photoDirectory) && !mkdir($photoDirectory, 0750, true) && !is_dir($photoDirectory)) {
-        throw new RuntimeException('Could not create the private photo directory.');
+    $runtimeFile = $target . '/api/runtime.php';
+    $temporaryRuntime = $runtimeFile . '.emc-new-' . bin2hex(random_bytes(4));
+    $runtimeContents = "<?php\ndeclare(strict_types=1);\nreturn " . var_export($backend, true) . ";\n";
+    if (file_put_contents($temporaryRuntime, $runtimeContents, LOCK_EX) === false || !rename($temporaryRuntime, $runtimeFile)) {
+        @unlink($temporaryRuntime);
+        throw new RuntimeException('Could not configure the private Laravel runtime path.');
     }
+    @chmod($runtimeFile, 0600);
     fwrite(STDOUT, "Deployed {$files} release files to {$target}\n");
-    fwrite(STDOUT, "Preserved any existing api/config.local.php and storage/order-photos files.\n");
-    fwrite(STDOUT, "Next: php {$target}/api/cli/migrate.php --status\n");
+    fwrite(STDOUT, "Laravel runtime: {$backend}\n");
+    fwrite(STDOUT, "Next: php {$backend}/artisan migrate:status\n");
 } catch (Throwable $exception) {
     fwrite(STDERR, 'Deployment failed: ' . $exception->getMessage() . "\n");
     exit(1);

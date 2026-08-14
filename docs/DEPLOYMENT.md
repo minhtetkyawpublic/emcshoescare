@@ -1,145 +1,115 @@
-# EMC Hostinger shared-hosting deployment
+# EMC Laravel deployment on Hostinger
 
-This release supports a domain root or any nested folder, for example `https://example.com/emc`, without rebuilding. Keep the Git checkout outside `public_html`; deploy the committed `dist` package into the chosen public folder after each SSH pull.
+The production URL for the current Hostinger folder is `https://k2softwarestudio.com/emcshoescare/`. Laravel stays in a private Git checkout outside `public_html`; the deployment command publishes only the React build and a protected API bridge.
 
-## 1. Hostinger requirements
+## 1. Requirements
 
-- PHP 8.2 or newer with PDO MySQL, mbstring, fileinfo, and OpenSSL
-- MySQL 8 or compatible MariaDB with `utf8mb4`
-- Apache `.htaccess` support (`mod_rewrite` and `mod_headers`)
-- HTTPS enabled for the domain
-- SSH access for `git pull`, migrations, administrator setup, and deployment
-- Cron access for backups and approved photo retention
+- PHP 8.2 or newer with PDO MySQL, mbstring, fileinfo, OpenSSL, tokenizer, XML, and ctype
+- Composer 2
+- MySQL 8 or compatible MariaDB using `utf8mb4`
+- Apache `.htaccess`, HTTPS, and SSH
 
-Node.js is not required on the hosting account. The production React files and PHP deployment package are committed under `dist` and verified by GitHub Actions.
+Node.js is not required on Hostinger because the compiled frontend is committed under `dist`.
 
-## 2. Clone privately and choose a public folder
-
-In SSH, use `pwd` to confirm your account paths. Clone the source somewhere outside the web root:
+## 2. Private checkout
 
 ```bash
-cd ~
-git clone https://github.com/minhtetkyawpublic/emcshoescare.git
-cd emcshoescare
+cd /home/u608908096
+git clone https://github.com/minhtetkyawpublic/emcshoescare.git emcshoescare-repo
+cd /home/u608908096/emcshoescare-repo
+git checkout main
 git pull --ff-only origin main
+composer install --working-dir=backend --no-dev --optimize-autoloader --no-interaction
 ```
 
-Run `php -v` in SSH and select Hostinger's PHP 8.2+ CLI binary if the default differs from the website's configured version.
+Do not clone the repository into `public_html`.
 
-Choose the actual Hostinger public path shown for the website in hPanel. These are examples only:
+## 3. Database and environment
 
-```text
-/home/account/domains/example.com/public_html
-/home/account/domains/example.com/public_html/emc
-/home/account/domains/example.com/public_html/projects/shoe-care
-```
-
-Deploy to that exact folder:
+In hPanel, open the website dashboard, then **Databases → Management**. Create a database/user and retain the complete Hostinger-prefixed names and password. The host is normally `localhost`.
 
 ```bash
-php scripts/deploy-release.php /absolute/path/to/public_html/emc
+cd /home/u608908096/emcshoescare-repo
+cp backend/.env.production.example backend/.env
+nano backend/.env
 ```
 
-The command creates missing subfolders and copies the complete `dist` package. It never deletes the target’s `api/config.local.php` or `storage/order-photos` contents. The package includes subfolder-safe relative assets, PHP API, protected migrations, PWA files, and Apache rules.
+Set at least:
 
-Do not point the web server at the repository root: it contains source and development files. Only the selected deployment target should be public.
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://k2softwarestudio.com/emcshoescare
 
-## 3. Create the Hostinger database
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=u608908096_actual_database
+DB_USERNAME=u608908096_actual_user
+DB_PASSWORD=actual-database-password
 
-Create a MySQL database and database user in hPanel, assign the user to that database, and retain the displayed database host/name/user/password. The migrations intentionally do not issue `CREATE DATABASE` or `USE`, because shared-host database names are controlled by hPanel.
+SESSION_PATH=/emcshoescare/
+SESSION_SECURE_COOKIE=true
+EMC_ALLOWED_ORIGINS=https://k2softwarestudio.com
+```
 
-In the deployed public folder, create the ignored local configuration:
+`EMC_ALLOWED_ORIGINS` contains only the HTTPS origin, not `/emcshoescare`. Generate the Laravel key after saving the database values:
 
 ```bash
-cd /absolute/path/to/public_html/emc
-cp api/config.production.example.php api/config.local.php
-php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'
-nano api/config.local.php
+php backend/artisan key:generate
+chmod 600 backend/.env
+chmod -R ug+rw backend/storage backend/bootstrap/cache
 ```
 
-Put the generated key, final HTTPS origin, and hPanel database values in `config.local.php`. `allowed_origins` contains only scheme and host—never the installation folder:
-
-```php
-'allowed_origins' => ['https://example.com'],
-```
-
-The cookie path is detected automatically from the deployed folder. Set `cookie_path` explicitly only if Hostinger uses an unusual proxy mapping; valid examples are `/`, `/emc/`, or `/projects/shoe-care/`.
-
-Protect the configuration as mode `600` where the hosting setup permits it:
+## 4. Migrations and administrator
 
 ```bash
-chmod 600 api/config.local.php
-chmod 750 storage/order-photos
+php backend/artisan migrate --seed --force
+php backend/artisan migrate:status
+php backend/artisan emc:create-admin emcadmin 'replace-with-a-long-unique-password' 'EMC Administrator'
 ```
 
-The included Apache rules deny configuration, CLI, migration, source, and private-photo paths over HTTP.
+Artisan records applied versions in Laravel's `migrations` table. Re-running `migrate --force` applies only pending migrations. Do not import the retired plain-PHP SQL files.
 
-## 4. Run database migrations
-
-Preview and apply the idempotent migrations over SSH:
+## 5. Deploy the public package
 
 ```bash
-php api/cli/migrate.php --dry-run
-php api/cli/migrate.php
-php api/cli/migrate.php --status
+php scripts/deploy-release.php /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
+php backend/artisan optimize
 ```
 
-The runner obtains a database lock, applies only pending numeric migrations, and records each completed version in `schema_migrations`. Running it again is safe and prints `Database is up to date.` A failed migration exits nonzero; do not continue deployment until its cause is corrected.
+The command creates `api/runtime.php` with the absolute private Laravel path and protects it with Apache rules. It does not publish `.env`, `vendor`, migrations, or photos.
 
-Create or reset the one administrator after migrations:
+## 6. Test
+
+1. Open `https://k2softwarestudio.com/emcshoescare/api/health`; expect successful JSON naming `EMC Laravel API`.
+2. Open `https://k2softwarestudio.com/emcshoescare/`.
+3. Open `https://k2softwarestudio.com/emcshoescare/admin` and sign in.
+4. Register a test customer, place an order with photos, and complete the status workflow.
+5. Confirm `https://k2softwarestudio.com/emcshoescare/api/runtime.php` is forbidden.
+
+If health returns 500:
 
 ```bash
-php api/cli/create-admin.php emcadmin 'replace-with-a-long-unique-password' 'EMC Administrator'
+cd /home/u608908096/emcshoescare-repo
+php backend/artisan about
+php backend/artisan migrate:status
+tail -n 100 backend/storage/logs/laravel.log
 ```
 
-Shell history can retain command arguments. A safer option is to set `EMC_ADMIN_USER`, `EMC_ADMIN_PASSWORD`, and `EMC_ADMIN_NAME` temporarily, run the command without arguments, and then unset them.
+Never paste `.env`, cookies, customer information, or full production logs into a public issue.
 
-## 5. PHP and upload settings
+## 7. Updates
 
-Configure the site’s PHP version and limits in hPanel or the supported per-directory PHP configuration:
-
-```text
-upload_max_filesize = 6M
-post_max_size = 55M
-max_file_uploads = 10
-memory_limit = 256M
-max_execution_time = 120
-```
-
-The frontend compresses photos before upload. The API independently accepts one to ten valid JPG, PNG, or WebP images, each no larger than the configured 5 MB limit.
-
-## 6. First production smoke test
-
-Replace the example origin/folder below with the real URL:
-
-1. Open `https://example.com/emc/api/health`; it must return an EMC API success response.
-2. Open the customer page and `/emc/admin`; both must load without missing assets.
-3. Confirm `/emc/admin/` canonicalizes to `/emc/admin`.
-4. Confirm `database/migrations/...`, `api/config.local.php`, `api/cli/migrate.php`, and `storage/order-photos` cannot be downloaded.
-5. Register, close/reopen the browser with **Remember me**, and confirm the session persists.
-6. Submit pickup and drop-off orders with photos and complete the administrator status workflow.
-7. Install from Android Chrome and iOS Safari and confirm the icon/name are EMC.
-
-Record results in `docs/ACCEPTANCE_TEST.md` and `RELEASE_CHECKLIST.md`.
-
-## 7. Updating from GitHub
-
-Take a verified database/photo backup before every update, then run from the private checkout:
+Take a database/photo backup, then:
 
 ```bash
-git status --short
+cd /home/u608908096/emcshoescare-repo
 git pull --ff-only origin main
-php scripts/deploy-release.php /absolute/path/to/public_html/emc
-cd /absolute/path/to/public_html/emc
-php api/cli/migrate.php --dry-run
-php api/cli/migrate.php
-php api/cli/migrate.php --status
+composer install --working-dir=backend --no-dev --optimize-autoloader --no-interaction
+php backend/artisan migrate --force
+php backend/artisan optimize
+php scripts/deploy-release.php /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
 ```
 
-The deployment command does not delete old hashed assets. They are harmless and allow safe rollback; periodically remove only assets proven unused by the current and retained rollback builds.
-
-## 8. Backups, cron, and rollback
-
-Configure the commands in `docs/OPERATIONS.md` with absolute Hostinger paths. Store encrypted backups outside `public_html` and preferably off-account. Keep photo cleanup disabled until EMC approves a retention period.
-
-For rollback, place the site in maintenance mode, restore the previous public package, and restore the matching database/photo backup if the schema or data changed. Then repeat the smoke test. Never roll database structure backward by manually deleting tables or migration records.
+No `npm run build` is required on Hostinger.

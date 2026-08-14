@@ -12,48 +12,31 @@ try {
   & npm.cmd audit --omit=dev
   if ($LASTEXITCODE -ne 0) { throw 'Production dependency audit failed.' }
 
-  Get-ChildItem api -Recurse -Filter '*.php' | ForEach-Object {
-    & php -l $_.FullName | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "PHP syntax check failed: $($_.FullName)" }
-  }
-  & php tests\subfolder-routing.php
-  if ($LASTEXITCODE -ne 0) { throw 'Arbitrary-subfolder routing checks failed.' }
-
+  Push-Location backend
   try {
-    $env:EMC_APP_ENV = 'production'
-    $env:EMC_DB_HOST = '127.0.0.1'
-    $env:EMC_DB_NAME = 'emc_release_probe'
-    $env:EMC_DB_USER = 'emc_release_user'
-    $env:EMC_DB_PASS = 'release-probe-password'
-    $env:EMC_ALLOWED_ORIGINS = 'https://emc.example.test'
-    $env:EMC_APP_KEY = 'replace-with-a-unique-random-string-of-at-least-32-characters'
-    $ErrorActionPreference = 'SilentlyContinue'
-    & php tests\bootstrap-config.php 2>$null | Out-Null
-    $appKeyProbeExit = $LASTEXITCODE
-
-    $env:EMC_APP_KEY = 'release-probe-key-with-more-than-thirty-two-characters'
-    $env:EMC_DB_NAME = 'hostinger_database_name'
-    & php tests\bootstrap-config.php 2>$null | Out-Null
-    $databaseProbeExit = $LASTEXITCODE
-
-    $env:EMC_DB_NAME = 'emc_release_probe'
-    $env:EMC_ALLOWED_ORIGINS = 'https://example.com'
-    & php tests\bootstrap-config.php 2>$null | Out-Null
-    $originProbeExit = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop'
-    if ($appKeyProbeExit -eq 0) { throw 'Production accepted the shipped app-key placeholder.' }
-    if ($databaseProbeExit -eq 0) { throw 'Production accepted the shipped database placeholder.' }
-    if ($originProbeExit -eq 0) { throw 'Production accepted the shipped origin placeholder.' }
-
-    $env:EMC_ALLOWED_ORIGINS = 'https://emc.example.test'
-    & php tests\bootstrap-config.php | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'A complete production configuration was rejected.' }
+    & composer validate --strict --no-interaction
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel Composer metadata is invalid.' }
+    & composer audit --no-dev --no-interaction
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel production dependency audit failed.' }
+    & php vendor\bin\pint --test
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel formatting check failed.' }
+    & php artisan route:list | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel routes could not be loaded.' }
+    & php artisan test
+    if ($LASTEXITCODE -ne 0) { throw 'Laravel feature tests failed.' }
   }
-  finally {
-    $ErrorActionPreference = 'Stop'
-    foreach ($environmentName in @('EMC_APP_ENV', 'EMC_DB_HOST', 'EMC_DB_NAME', 'EMC_DB_USER', 'EMC_DB_PASS', 'EMC_ALLOWED_ORIGINS', 'EMC_APP_KEY')) {
-      Remove-Item "Env:$environmentName" -ErrorAction SilentlyContinue
+  finally { Pop-Location }
+
+  $phpRoots = @('backend\app', 'backend\bootstrap', 'backend\config', 'backend\database', 'backend\routes')
+  foreach ($phpRoot in $phpRoots) {
+    Get-ChildItem $phpRoot -Recurse -Filter '*.php' | ForEach-Object {
+      & php -l $_.FullName | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "PHP syntax check failed: $($_.FullName)" }
     }
+  }
+  foreach ($phpFile in @('backend\artisan', 'hosting\laravel-api-index.php', 'scripts\deploy-release.php')) {
+    & php -l $phpFile | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "PHP syntax check failed: $phpFile" }
   }
 
   & node -e "import('./src/i18n/translations.js').then(({translations})=>{const en=Object.keys(translations.en),mm=Object.keys(translations.mm);if(en.length!==mm.length||en.some(k=>!(k in translations.mm))||mm.some(k=>!(k in translations.en)))process.exit(1)})"
@@ -79,87 +62,71 @@ try {
   if (-not $worker.Contains('requestUrl.pathname.includes("/api/")') -or -not $worker.Contains('event.request.method !== "GET"')) {
     throw 'Service worker no longer excludes private API or mutation traffic.'
   }
-  $orderLibrary = Get-Content api\lib\Orders.php -Raw
-  if (-not $orderLibrary.Contains("header('Cache-Control: no-store, private')")) {
+  $photoController = Get-Content backend\app\Http\Controllers\OrderController.php -Raw
+  if (-not $photoController.Contains("'Cache-Control' => 'no-store, private'")) {
     throw 'Authenticated order photos must not be stored in browser caches.'
   }
-  Get-ChildItem database\migrations -Filter '*.sql' | ForEach-Object {
-    $migrationSql = Get-Content $_.FullName -Raw
-    if ($migrationSql -match '(?i)ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS') {
-      throw "Migration uses MariaDB-only ADD COLUMN syntax instead of the MySQL-compatible conditional pattern: $($_.Name)"
-    }
-    if ($migrationSql -match '(?im)^\s*(CREATE\s+DATABASE|USE\s+)') {
-      throw "Migration assumes permission to create or select a hard-coded database: $($_.Name)"
-    }
+
+  $required = @(
+    'backend\artisan', 'backend\composer.json', 'backend\composer.lock', 'backend\.env.production.example',
+    'backend\database\migrations\2026_08_14_000000_create_emc_schema.php',
+    'hosting\shared-hosting.htaccess', 'hosting\laravel-api.htaccess', 'hosting\laravel-api-index.php',
+    'scripts\deploy-release.php', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md',
+    'dist\.release.json', 'dist\.htaccess', 'dist\api\.htaccess', 'dist\api\index.php'
+  )
+  foreach ($path in $required) {
+    if (-not (Test-Path -LiteralPath $path)) { throw "Required release file is missing: $path" }
   }
-  foreach ($required in @('RELEASE_CHECKLIST.md', 'docs\CONTENT_WORKSHEET.md', 'docs\ACCEPTANCE_TEST.md', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md', 'docs\HANDOVER.md', 'database\migrations\004_add_order_idempotency.sql', 'api\cli\migrate.php', 'api\config.production.example.php', 'hosting\shared-hosting.htaccess', 'scripts\deploy-release.php', 'dist\.release.json', 'dist\.htaccess', 'dist\api\index.php', 'dist\api\cli\migrations\004_add_order_idempotency.sql', 'dist\storage\.htaccess')) {
-    if (-not (Test-Path -LiteralPath $required)) { throw "Required release file is missing: $required" }
+  foreach ($forbidden in @('dist\api\runtime.php', 'dist\vendor', 'dist\.env', 'dist\storage', 'dist\database')) {
+    if (Test-Path -LiteralPath $forbidden) { throw "Private Laravel material leaked into the public package: $forbidden" }
   }
-  if (Test-Path -LiteralPath 'dist\api\config.local.php') { throw 'A local database configuration leaked into the release package.' }
+
   $releaseMetadata = Get-Content dist\.release.json -Raw | ConvertFrom-Json
   $packageMetadata = Get-Content package.json -Raw | ConvertFrom-Json
-  if ($releaseMetadata.version -ne $packageMetadata.version -or $releaseMetadata.shortName -ne 'EMC') {
-    throw 'The shared-hosting release metadata is stale or has the wrong app identity.'
+  if ($releaseMetadata.version -ne $packageMetadata.version -or $releaseMetadata.shortName -ne 'EMC' -or $releaseMetadata.framework -ne 'Laravel 12') {
+    throw 'The shared-hosting release metadata is stale or has the wrong framework identity.'
   }
   $builtIndex = Get-Content dist\index.html -Raw
   if ($builtIndex -match '(?:src|href)="/(?!/)') { throw 'The production HTML contains a document-root asset URL and is not subfolder-safe.' }
-  $apiSourceRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'api')).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-  foreach ($sourceFile in @(Get-ChildItem api -Recurse -File | Where-Object Name -ne 'config.local.php')) {
-    if (-not $sourceFile.FullName.StartsWith($apiSourceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-      throw "API source escaped its expected root: $($sourceFile.FullName)"
-    }
-    $relativePath = $sourceFile.FullName.Substring($apiSourceRoot.Length)
-    $packagedFile = Join-Path (Join-Path $projectRoot 'dist\api') $relativePath
-    if (-not (Test-Path -LiteralPath $packagedFile) -or (Get-FileHash $sourceFile.FullName).Hash -ne (Get-FileHash $packagedFile).Hash) {
-      throw "Packaged API is missing or stale: $relativePath"
-    }
-  }
-  foreach ($migrationFile in @(Get-ChildItem database\migrations -Filter '*.sql' -File)) {
-    $packagedMigration = Join-Path $projectRoot (Join-Path 'dist\api\cli\migrations' $migrationFile.Name)
-    if (-not (Test-Path -LiteralPath $packagedMigration) -or (Get-FileHash $migrationFile.FullName).Hash -ne (Get-FileHash $packagedMigration).Hash) {
-      throw "Packaged migration is missing or stale: $($migrationFile.Name)"
-    }
-  }
-  if ((Get-FileHash 'hosting\shared-hosting.htaccess').Hash -ne (Get-FileHash 'dist\.htaccess').Hash) {
-    throw 'The deployed Apache rules are stale.'
-  }
-  if (Test-Path -LiteralPath 'dist\database') { throw 'Source-style database paths leaked into the public package.' }
+  if ((Get-FileHash 'hosting\shared-hosting.htaccess').Hash -ne (Get-FileHash 'dist\.htaccess').Hash) { throw 'The deployed Apache rules are stale.' }
+  if ((Get-FileHash 'hosting\laravel-api.htaccess').Hash -ne (Get-FileHash 'dist\api\.htaccess').Hash) { throw 'The deployed Laravel API rules are stale.' }
+  if ((Get-FileHash 'hosting\laravel-api-index.php').Hash -ne (Get-FileHash 'dist\api\index.php').Hash) { throw 'The deployed Laravel API bridge is stale.' }
 
   $deploymentAuditRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("emc-deploy-audit-" + [guid]::NewGuid().ToString('N'))
   $deploymentTarget = Join-Path $deploymentAuditRoot 'shared\projects\emc'
   try {
     & php scripts\deploy-release.php $deploymentTarget | Out-Null
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $deploymentTarget 'api\index.php'))) {
-      throw 'The shared-hosting deployment command failed.'
+    if ($LASTEXITCODE -ne 0) { throw 'The Laravel shared-hosting deployment command failed.' }
+    $runtimeFile = Join-Path $deploymentTarget 'api\runtime.php'
+    $runtime = & php -r "`$path=require '$($runtimeFile.Replace('\', '/'))'; echo `$path;"
+    $expectedRuntime = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'backend'))
+    if (-not (Test-Path -LiteralPath (Join-Path $deploymentTarget 'api\index.php')) -or [System.IO.Path]::GetFullPath($runtime) -ne $expectedRuntime) {
+      throw 'The public API bridge does not reference the private Laravel runtime.'
     }
-    $configSentinel = Join-Path $deploymentTarget 'api\config.local.php'
-    $photoSentinel = Join-Path $deploymentTarget 'storage\order-photos\release-check.txt'
-    [System.IO.File]::WriteAllText($configSentinel, '<?php return [''sentinel'' => ''preserve''];')
-    [System.IO.File]::WriteAllText($photoSentinel, 'preserve-private-photo')
-    $configHash = (Get-FileHash $configSentinel).Hash
-    $photoHash = (Get-FileHash $photoSentinel).Hash
+    $sentinel = Join-Path $deploymentTarget 'hostinger-user-file.txt'
+    [System.IO.File]::WriteAllText($sentinel, 'preserve-target-file')
+    $sentinelHash = (Get-FileHash $sentinel).Hash
     & php scripts\deploy-release.php $deploymentTarget | Out-Null
-    if ($LASTEXITCODE -ne 0 -or (Get-FileHash $configSentinel).Hash -ne $configHash -or (Get-FileHash $photoSentinel).Hash -ne $photoHash) {
-      throw 'Redeployment did not preserve server configuration and private photos.'
-    }
+    if ($LASTEXITCODE -ne 0 -or (Get-FileHash $sentinel).Hash -ne $sentinelHash) { throw 'Redeployment did not preserve unrelated target files.' }
   }
   finally {
     if (Test-Path -LiteralPath $deploymentAuditRoot) {
-      $verifiedAuditRoot = [System.IO.Path]::GetFullPath($deploymentAuditRoot)
+      $verified = [System.IO.Path]::GetFullPath($deploymentAuditRoot)
       $temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-      if (-not $verifiedAuditRoot.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or (Split-Path $verifiedAuditRoot -Leaf) -notmatch '^emc-deploy-audit-[a-f0-9]{32}$') {
-        throw "Unsafe deployment-audit cleanup path: $verifiedAuditRoot"
+      if (-not $verified.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or (Split-Path $verified -Leaf) -notmatch '^emc-deploy-audit-[a-f0-9]{32}$') {
+        throw "Unsafe deployment-audit cleanup path: $verified"
       }
-      [System.IO.Directory]::Delete($verifiedAuditRoot, $true)
+      [System.IO.Directory]::Delete($verified, $true)
     }
   }
+
   & git ls-files --error-unmatch dist\index.html | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'The SSH-ready dist package is not tracked by Git.' }
+  if ($LASTEXITCODE -ne 0) { throw 'The SSH-ready frontend package is not tracked by Git.' }
   & git diff --exit-code -- dist | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'The committed dist package is stale; run npm run build and stage dist.' }
   & git diff --check
   if ($LASTEXITCODE -ne 0) { throw 'Git whitespace check failed.' }
-  Write-Output 'PASS release static checks'
+  Write-Output 'PASS Laravel release checks'
 }
 finally {
   Pop-Location

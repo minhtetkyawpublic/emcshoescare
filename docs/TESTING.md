@@ -1,64 +1,48 @@
-# Phase 6 verification evidence
+# Laravel release verification evidence
 
-Last local verification: 2026-08-14 on the project XAMPP environment.
+Last local verification: 2026-08-14 on Windows/XAMPP with PHP 8.2, Composer 2, Apache, and MySQL.
 
-## Automated release checks
+## Automated checks
 
-`scripts/release-check.ps1` passed:
+The release suite verifies:
 
-- ESLint including JSX accessibility rules
-- Vite production build (about 297 KB JavaScript / 87 KB gzip and 52 KB CSS / 11 KB gzip)
-- syntax validation for every PHP file
-- exact English/Myanmar translation-key parity (252 keys per language at the time of review)
-- PWA identity, manifest, regular/maskable/Apple icon dimensions
-- service-worker exclusion of API and non-GET traffic
-- authenticated private-photo responses use `no-store`
-- arbitrary nested-folder cookie/API routing and root-relative asset rejection
-- exact source-to-`dist` API/migration/Apache-rule parity
-- production rejection of shipped app-key, database, and origin placeholders
-- required migration and release-document presence
-- Git whitespace validation
+- ESLint and the Vite production build
+- npm and Composer production dependency audits
+- strict Composer metadata validation
+- Laravel route loading, PHP syntax, Pint formatting, and feature tests
+- exact English/Myanmar translation-key parity
+- PWA identity, offline behavior, and icon dimensions
+- exclusion of API and mutation traffic from service-worker caches
+- authenticated private-photo `no-store` responses
+- no Laravel `.env`, runtime path, Composer vendor tree, migrations, or photos in `dist`
+- byte parity for public Apache rules and the Laravel bridge
+- deployment into a multi-level folder with the private runtime path generated correctly
+- deterministic, committed `dist` output and Git whitespace checks
 
-`npm audit --omit=dev` reported zero known vulnerabilities during this Phase 6 verification.
+## Laravel feature workflow
 
-The committed `1.0.0-rc.1` shared-host package was deployed into a multi-level local Apache path. The customer page, `/admin`, API health, hashed assets, and PWA manifest returned successfully; `/admin/` canonicalized with HTTP 308; configuration, CLI, packaged migration, release metadata, and private-photo paths returned 403/404. A second deployment preserved an existing `api/config.local.php` and uploaded-photo sentinel byte-for-byte.
+`php artisan test` passes 32 assertions covering health, CSRF bootstrapping, customer registration, package retrieval, a private-photo order, duplicate-request replay, administrator login, order retrieval, every pickup status through Done, and authenticated photo delivery.
 
-The CLI migration runner was also exercised against a new isolated database from both the source checkout and packaged `dist` tree. Dry-run listed four pending versions, migrate created 11 tables/three seed packages and recorded all four versions, status showed each applied, and a repeated migrate reported the database up to date.
+## Full MySQL workflow
 
-## Full local API workflow
+`tests/e2e-local.ps1` passed against a fresh isolated MySQL database and Laravel's real database-session driver. It proved:
 
-`tests/e2e-local.ps1` passed and proved:
+- administrator login and remembered customer registration
+- package create/edit/archive and pickup-fee update/restoration
+- pickup and drop-off orders, including the ten-photo maximum
+- duplicate upload retry returns the original order
+- all pickup and drop-off status transitions with timeline notes
+- unread status and mark-as-read behavior
+- administrator/owner photo access with `no-store`
+- 404 denial for another customer attempting order or photo access
+- logout and cleanup of temporary database rows and private files
 
-- single-admin login and remembered customer registration without OTP
-- session reload returns the same customer ID and a persistent remember cookie
-- package create, edit, and archive
-- optional pickup-fee update and restoration
-- pickup and customer drop-off orders with private photos and correct fixed-price totals
-- the pickup order accepts and preserves the maximum of ten photos
-- same request ID replay returns the same order rather than a duplicate
-- administrator and owning customer can view private photos without browser caching
-- a different signed-in customer receives 404 for both the order and its photo
-- all pickup statuses from Submitted through Done and the shorter drop-off path, with English/Myanmar note fields
-- eight-entry pickup and six-entry drop-off timelines, unread notifications, and mark-as-read behavior
-- logout and complete removal of test data/files
+The isolated audit database and local server were removed after verification.
 
-After the run, customers, orders, photos, histories, customer sessions, and admin sessions were all zero; the one real administrator and three seed packages remained.
+## Arbitrary-folder Apache deployment
 
-The same database-backed workflow is now a required GitHub Actions job. It starts a clean MySQL 8.4 service and PHP 8.2 API on an Ubuntu runner, previews/applies/rechecks the CLI migrations, creates an ephemeral administrator, and runs the portable PowerShell test. This complements the separate Windows static-release job and catches platform-specific PHP/MySQL regressions on every push and pull request.
+The committed release was deployed at a deep local path containing an `api-project` parent. Customer home, `/admin`, API health, unauthenticated session/CSRF bootstrap, hashed assets, and PWA files worked. `/admin/` returned a correct URL-only 308 redirect, and direct access to `api/runtime.php` returned 403. The generated runtime file pointed to the private `backend` checkout rather than exposing framework code under the web root.
 
-## Backup and retention
+## Human gates
 
-The backup command created a MySQL/photo ZIP and matching SHA-256 file. The checksum passed. Its SQL was restored into a new isolated database; the restored result contained 11 tables, four recorded migrations, one administrator, and three packages. The UTF-8 bytes of a Myanmar package name matched the source database exactly. The scratch database and test archive were then removed.
-
-The retention command was tested first in dry-run mode and then execute mode against one isolated 40-day-old Done order. It selected one order/one photo/18,219 bytes, deleted only the photo and its metadata, removed the empty private directory, and retained the order. The test order/customer were then removed.
-
-## Production guards and HTTP security
-
-- Insecure production configuration exits before startup when the app key is weak.
-- A strong key, HTTPS origin, non-root user, and non-empty database password pass configuration validation.
-- Apache returns CSP and restrictive browser headers, routes `/admin` to the SPA, denies direct database/package access, and marks the service worker `no-store`.
-- API responses use `no-store, private`.
-
-## Evidence still requiring people/devices
-
-No controllable browser was available in the workspace during Phase 5 or this Phase 6 pass. Responsive CSS and accessibility behavior were reviewed statically, and dialogs now trap keyboard focus and restore it on close, but this is not a substitute for the Android, iOS, tablet, and desktop acceptance checks listed in `RELEASE_CHECKLIST.md`. Real shop details and Myanmar wording also require EMC approval.
+Android, iOS, tablet, desktop, real shop content, privacy wording, production backups, and staff acceptance remain recorded as manual launch gates in `RELEASE_CHECKLIST.md` and `docs/ACCEPTANCE_TEST.md`.

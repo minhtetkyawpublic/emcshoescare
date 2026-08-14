@@ -11,7 +11,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
-$photoRoot = Join-Path $projectRoot 'storage\order-photos'
+$photoRoot = Join-Path $projectRoot 'backend\storage\app\private\order-photos'
+if (-not (Test-Path -LiteralPath $photoRoot)) { New-Item -ItemType Directory -Path $photoRoot -Force | Out-Null }
 $backupRootFull = [System.IO.Path]::GetFullPath($BackupRoot)
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')
 $stage = Join-Path $backupRootFull "emc-$stamp"

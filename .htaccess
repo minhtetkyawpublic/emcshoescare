@@ -3,10 +3,9 @@ AddType application/manifest+json .webmanifest
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(?:src|docs|database|scripts|tests|node_modules|backups|\.git|\.github)(?:/|$) - [F,L,NC]
-  RewriteRule ^api/(?:cli|lib)(?:/|$) - [F,L,NC]
-  RewriteRule ^api/(?:bootstrap|config(?:\.local|\.production\.example)?)\.php$ - [F,L,NC]
-  RewriteRule ^admin/$ admin [R=308,L,NE]
+  RewriteRule ^(?:src|docs|backend|hosting|scripts|tests|node_modules|backups|\.git|\.github)(?:/|$) - [F,L,NC]
+  RewriteCond %{REQUEST_URI} ^(.*)/admin/$
+  RewriteRule ^admin/$ %1/admin [R=308,L,NE]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]

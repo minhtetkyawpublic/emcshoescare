@@ -1,9 +1,0 @@
-Options -MultiViews
-RewriteEngine On
-
-RewriteRule ^(?:cli|lib)(?:/|$) - [F,L,NC]
-RewriteRule ^(?:bootstrap|config(?:\.local|\.production\.example)?)\.php$ - [F,L,NC]
-
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]

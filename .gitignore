@@ -32,9 +32,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!/backend/.env.example
+!/backend/.env.production.example
 
 # local PHP configuration
 /api/config.local.php
+/backend/.env
+/backend/vendor/
+/backend/node_modules/
+/backend/public/build/
 
 # vercel
 .vercel
@@ -42,9 +48,7 @@ yarn-error.log*
 # typescript
 next-env.d.ts
 # The production-ready shared-hosting package is committed so an SSH pull can deploy without Node.js.
-/dist/api/config.local.php
-/dist/storage/order-photos/*
-!/dist/storage/order-photos/.gitkeep
+/dist/api/runtime.php
 /.wrangler/
 /outputs/
 /work/

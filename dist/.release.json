@@ -2,8 +2,10 @@
   "format": 1,
   "application": "EMC Shoes Care Myanmar",
   "shortName": "EMC",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "entrypoint": "index.html",
   "api": "api/index.php",
-  "migrations": "api/cli/migrations"
+  "framework": "Laravel 12",
+  "runtime": "private backend/ checkout",
+  "migrations": "backend/database/migrations"
 }
