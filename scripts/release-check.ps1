@@ -75,6 +75,7 @@ try {
 
   $required = @(
     'backend\artisan', 'backend\composer.json', 'backend\composer.lock', 'backend\.env.production.example',
+    'backend\resources\views\.gitkeep',
     'backend\database\migrations\2026_08_14_000000_create_emc_schema.php',
     'hosting\shared-hosting.htaccess', 'hosting\laravel-api.htaccess', 'hosting\laravel-api-index.php',
     'scripts\deploy-release.php', 'docs\DEPLOYMENT.md', 'docs\OPERATIONS.md',
