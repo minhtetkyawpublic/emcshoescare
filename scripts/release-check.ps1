@@ -16,11 +16,12 @@ try {
   try {
     & composer validate --strict --no-interaction
     if ($LASTEXITCODE -ne 0) { throw 'Laravel Composer metadata is invalid.' }
-    # Composer writes the successful "No security vulnerability advisories found"
-    # message to stderr on some Windows installations. Route both streams through
-    # cmd so PowerShell 5 does not promote that message to a terminating error.
-    & cmd.exe /d /s /c "composer audit --no-dev --no-interaction 2>&1"
-    if ($LASTEXITCODE -ne 0) { throw 'Laravel production dependency audit failed.' }
+    # Composer writes its successful audit summary to stderr on some Windows
+    # installations. Run the resolved executable directly so PowerShell does not
+    # promote that native stderr message to a terminating error.
+    $composerCommand = Get-Command composer -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    $composerAudit = Start-Process -FilePath $composerCommand.Source -ArgumentList @('audit', '--no-dev', '--no-interaction') -NoNewWindow -Wait -PassThru
+    if ($composerAudit.ExitCode -ne 0) { throw 'Laravel production dependency audit failed.' }
     & php vendor\bin\pint --test
     if ($LASTEXITCODE -ne 0) { throw 'Laravel formatting check failed.' }
     & php artisan route:list | Out-Null
