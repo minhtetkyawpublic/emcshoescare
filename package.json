@@ -5,24 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/package-release.mjs",
+    "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src"
+    "lint": "eslint resources/js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
-    "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "vite": "latest"
   },
   "devDependencies": {
     "@eslint/js": "latest",
     "eslint": "latest",
+    "eslint-plugin-jsx-a11y": "latest",
     "eslint-plugin-react": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
-    "eslint-plugin-jsx-a11y": "latest",
-    "globals": "latest"
+    "globals": "latest",
+    "laravel-vite-plugin": "^3.2.0"
   }
 }

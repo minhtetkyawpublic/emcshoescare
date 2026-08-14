@@ -1,5 +1,5 @@
 # Keep source text deterministic on every development and CI platform.
 * text=auto eol=lf
 
-# Release artifacts must be byte-identical across Windows and Linux checkouts.
-/dist/** -text
+# Vite artifacts must be byte-identical across Windows and Linux checkouts.
+/public/build/** -text

@@ -3,12 +3,15 @@ AddType application/manifest+json .webmanifest
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(?:src|docs|backend|hosting|scripts|tests|node_modules|backups|\.git|\.github)(?:/|$) - [F,L,NC]
-  RewriteCond %{REQUEST_URI} ^(.*)/admin/$
-  RewriteRule ^admin/$ %1/admin [R=308,L,NE]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^ index.html [L]
+
+  RewriteRule (^|/)\. - [F,L]
+  RewriteRule ^(?:app|backend|bootstrap|config|database|resources|routes|storage|tests|vendor|node_modules|scripts|docs)(?:/|$) - [F,L,NC]
+  RewriteRule ^public(?:/|$) - [L,NC]
+
+  RewriteRule ^build(/.*)?$ public/$0 [L,NC]
+  RewriteRule ^(manifest\.webmanifest|sw\.js|offline\.html|offline\.css|apple-touch-icon\.png|icon-192\.png|icon-512\.png|maskable-512\.png|emcicon\.jpg)$ public/$1 [L,NC]
+
+  RewriteRule ^ index.php [L]
 </IfModule>
 
 <IfModule mod_headers.c>
@@ -23,6 +26,6 @@ AddType application/manifest+json .webmanifest
   </Files>
 </IfModule>
 
-<FilesMatch "^(\.env|\.release\.json|composer\.(json|lock)|package(-lock)?\.json)$">
+<FilesMatch "^(\.env|composer\.(json|lock)|package(-lock)?\.json|artisan|phpunit\.xml)$">
   Require all denied
 </FilesMatch>

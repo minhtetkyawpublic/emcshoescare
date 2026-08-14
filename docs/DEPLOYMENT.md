@@ -1,133 +1,118 @@
-# EMC Laravel deployment on Hostinger
+# Hostinger deployment
 
-The production URL for the current Hostinger folder is `https://k2softwarestudio.com/emcshoescare/`. Laravel stays in a private Git checkout outside `public_html`; the deployment command publishes only the React build and a protected API bridge.
+## Layout
 
-## 1. Requirements
+The repository is one Laravel + React + Vite application and may be checked out
+directly into:
 
-- PHP 8.2 or newer with PDO MySQL, mbstring, fileinfo, OpenSSL, tokenizer, XML, and ctype
-- Composer 2
-- MySQL 8 or compatible MariaDB using `utf8mb4`
-- Apache `.htaccess`, HTTPS, and SSH
+```text
+/home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
+```
 
-Node.js is not required on Hostinger because the compiled frontend is committed under `dist`.
+The root `.htaccess` sends compiled/PWA files to `public/` and everything else
+to Laravel's root front controller. Requests cannot directly read `.env`, Git,
+Composer files, application source, migrations, storage, or vendor code.
 
-## 2. Private checkout
+The preferred server configuration is still a document root pointing at the
+Laravel `public/` directory. The included root front controller exists for
+shared hosting where the document root cannot be changed.
+
+## First installation
 
 ```bash
-cd /home/u608908096
-git clone https://github.com/minhtetkyawpublic/emcshoescare.git emcshoescare-repo
-cd /home/u608908096/emcshoescare-repo
-git checkout main
-git pull --ff-only origin main
-composer install --working-dir=backend --no-dev --optimize-autoloader --no-interaction
+cd /home/u608908096/domains/k2softwarestudio.com/public_html
+git clone https://github.com/minhtetkyawpublic/emcshoescare.git emcshoescare
+cd emcshoescare
+
+composer install --no-dev --optimize-autoloader --no-interaction
+test -f .env || cp .env.production.example .env
+nano .env
+php artisan key:generate
+chmod 600 .env
+chmod -R ug+rw storage bootstrap/cache
+php artisan migrate --seed --force
+php artisan emc:create-admin emcadmin 'replace-with-a-long-unique-password' 'EMC Administrator'
+php artisan optimize
 ```
 
-Do not clone the repository into `public_html`.
+Configure the full Hostinger-provided MySQL database name, username, and
+password in `.env`. `DB_HOST` is normally `localhost`.
 
-## 3. Database and environment
+The production frontend is already committed in `public/build`; `npm run build`
+is not required on Hostinger after pulling a release.
 
-In hPanel, open the website dashboard, then **Databases → Management**. Create a database/user and retain the complete Hostinger-prefixed names and password. The host is normally `localhost`.
+## URLs
+
+- App: `https://k2softwarestudio.com/emcshoescare/`
+- Admin: `https://k2softwarestudio.com/emcshoescare/admin`
+- Health: `https://k2softwarestudio.com/emcshoescare/api/health`
+
+Verify private material is blocked:
 
 ```bash
-cd /home/u608908096/emcshoescare-repo
-cp backend/.env.production.example backend/.env
-nano backend/.env
+for path in .env composer.json artisan app/Models/Customer.php .git/config; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "https://k2softwarestudio.com/emcshoescare/$path")
+  echo "$path -> $code"
+done
 ```
 
-Set at least:
+No private URL may return file contents or HTTP 200. A 403 response is expected.
 
-```dotenv
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://k2softwarestudio.com/emcshoescare
-
-DB_CONNECTION=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=u608908096_actual_database
-DB_USERNAME=u608908096_actual_user
-DB_PASSWORD=actual-database-password
-
-SESSION_PATH=/emcshoescare/
-SESSION_SECURE_COOKIE=true
-EMC_ALLOWED_ORIGINS=https://k2softwarestudio.com
-```
-
-`EMC_ALLOWED_ORIGINS` contains only the HTTPS origin, not `/emcshoescare`. Generate the Laravel key after saving the database values:
-
-```bash
-php backend/artisan key:generate
-chmod 600 backend/.env
-chmod -R ug+rw backend/storage backend/bootstrap/cache
-```
-
-## 4. Migrations and administrator
-
-```bash
-php backend/artisan migrate --seed --force
-php backend/artisan migrate:status
-php backend/artisan emc:create-admin emcadmin 'replace-with-a-long-unique-password' 'EMC Administrator'
-```
-
-Artisan records applied versions in Laravel's `migrations` table. Re-running `migrate --force` applies only pending migrations. Do not import the retired plain-PHP SQL files.
-
-## 5. Deploy the public package
-
-```bash
-php scripts/deploy-release.php /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
-php backend/artisan optimize
-```
-
-The command creates `api/runtime.php` with the absolute private Laravel path and protects it with Apache rules. It does not publish `.env`, `vendor`, migrations, or photos.
-
-### Complete checkout inside `public_html`
-
-Keeping the checkout outside `public_html` is preferred. When the hosting layout
-requires the complete repository to live in the public target, deploy to the
-repository root itself. The generated root `.htaccess` allows only the compiled
-frontend files, `assets/`, and `api/`; it returns HTTP 403 for every other real
-file or directory. This protection requires Apache `mod_rewrite` and `.htaccess`
-overrides, both of which must remain enabled.
+## Updating
 
 ```bash
 cd /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
-php scripts/deploy-release.php "$PWD"
+git pull origin main
+composer install --no-dev --optimize-autoloader --no-interaction
+php artisan migrate --force
+chmod -R ug+rw storage bootstrap/cache
+php artisan optimize
 ```
 
-After deployment, verify that the application and health endpoint return 200,
-while `/backend/.env`, `/backend/artisan`, `/.git/config`, and `/package.json`
-return 403. Never continue with this layout if any private test URL is readable.
+No copy/deployment bridge command is needed. `git pull` updates the unified app
+and its tracked `public/build` assets together.
 
-## 6. Test
+## One-time upgrade from the old `backend/` layout
 
-1. Open `https://k2softwarestudio.com/emcshoescare/api/health`; expect successful JSON naming `EMC Laravel API`.
-2. Open `https://k2softwarestudio.com/emcshoescare/`.
-3. Open `https://k2softwarestudio.com/emcshoescare/admin` and sign in.
-4. Register a test customer, place an order with photos, and complete the status workflow.
-5. Confirm `https://k2softwarestudio.com/emcshoescare/api/runtime.php` is forbidden.
-
-If health returns 500:
+After pulling the first unified release, preserve the existing environment and
+private order photos before retiring the old directory:
 
 ```bash
-cd /home/u608908096/emcshoescare-repo
-php backend/artisan about
-php backend/artisan migrate:status
-tail -n 100 backend/storage/logs/laravel.log
+cd /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
+git pull origin main
+
+test -f .env || cp backend/.env .env
+mkdir -p storage/app/private/order-photos
+if [ -d backend/storage/app/private/order-photos ]; then
+  cp -a backend/storage/app/private/order-photos/. storage/app/private/order-photos/
+fi
+
+composer install --no-dev --optimize-autoloader --no-interaction
+chmod 600 .env
+chmod -R ug+rw storage bootstrap/cache
+php artisan optimize:clear
+php artisan migrate --force
+php artisan optimize
 ```
 
-Never paste `.env`, cookies, customer information, or full production logs into a public issue.
-
-## 7. Updates
-
-Take a database/photo backup, then:
+Confirm that the app, admin area, existing orders, and photos work. Then move
+the legacy directory outside the public web root as a recoverable backup:
 
 ```bash
-cd /home/u608908096/emcshoescare-repo
-git pull --ff-only origin main
-composer install --working-dir=backend --no-dev --optimize-autoloader --no-interaction
-php backend/artisan migrate --force
-php backend/artisan optimize
-php scripts/deploy-release.php /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare
+test ! -e /home/u608908096/emcshoescare-backend-legacy-backup
+mv backend /home/u608908096/emcshoescare-backend-legacy-backup
 ```
 
-No `npm run build` is required on Hostinger.
+The root `.htaccess` denies requests to `backend/` during this transition.
+
+## Diagnostics
+
+```bash
+php artisan about
+php artisan migrate:status
+php artisan route:list
+tail -n 100 storage/logs/laravel.log
+```
+
+Never share `.env`, passwords, cookies, customer information, or full production
+logs publicly.

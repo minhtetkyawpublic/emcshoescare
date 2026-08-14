@@ -255,7 +255,7 @@ finally {
     Invoke-TestMySql @('-D', $DatabaseName, '-e', 'DELETE FROM sessions;') | Out-Null
   }
   foreach ($storageRecord in $storageRecords) {
-    $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'backend\storage\app\private\order-photos'))
+    $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'storage\app\private\order-photos'))
     $directory = [System.IO.Path]::GetFullPath((Join-Path $root $storageRecord.StorageKey))
     $requiredPrefix = $root.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
     if ($directory.StartsWith($requiredPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {

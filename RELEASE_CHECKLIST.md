@@ -8,7 +8,7 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 
 - [x] React customer/admin interfaces with Laravel 12 and MySQL
 - [x] Phone/password registration and remembered login without OTP
-- [x] English/Myanmar copy stored together in `src/i18n/translations.js` with matching keys
+- [x] English/Myanmar copy stored together in `resources/js/i18n/translations.js` with matching keys
 - [x] Fixed-price packages in Ks managed by the single administrator role
 - [x] Customer drop-off and optional-fee pickup paths
 - [x] One to ten compressed photos stored privately
@@ -21,9 +21,9 @@ Record the human/device evidence in `docs/ACCEPTANCE_TEST.md`; use `docs/CONTENT
 - [x] Tested database/photo backup command with checksum
 - [x] Dry-run-first terminal-order photo-retention command
 - [x] Deployment, operations, and staff/customer handover guides
-- [x] SSH-ready `dist` package deployable at a domain root or arbitrary nested folder
+- [x] Unified Laravel/Vite `public/build` deployable at a domain root or arbitrary nested folder
 - [x] Laravel Artisan migrations and seed data verified on fresh MySQL and repeated runs
-- [x] Private Laravel runtime, environment, migrations, Composer packages, and photos remain outside `public_html`
+- [x] Root front controller prevents direct web access to Laravel environment, source, migrations, Composer packages, and photos
 
 ## Required business inputs
 

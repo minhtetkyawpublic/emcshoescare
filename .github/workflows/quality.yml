@@ -40,7 +40,7 @@ jobs:
       - name: Install locked dependencies
         run: |
           npm ci
-          composer install --working-dir=backend --no-interaction --prefer-dist
+          composer install --no-interaction --prefer-dist
 
       - name: Run release checks
         shell: powershell
@@ -99,23 +99,23 @@ jobs:
           coverage: none
 
       - name: Install locked Laravel dependencies
-        run: composer install --working-dir=backend --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist
 
       - name: Run database migrations
         shell: pwsh
         run: |
-          php backend/artisan migrate --seed --force
-          php backend/artisan migrate:status
-          php backend/artisan migrate --force
+          php artisan migrate --seed --force
+          php artisan migrate:status
+          php artisan migrate --force
 
       - name: Create temporary administrator and start API
         shell: bash
         run: |
-          php backend/artisan emc:create-admin emcaudit 'EMC-Release-Audit-2026!' 'Release Audit'
-          php backend/artisan serve --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/emc-api.log" 2>&1 &
+          php artisan emc:create-admin emcaudit 'EMC-Release-Audit-2026!' 'Release Audit'
+          php artisan serve --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/emc-api.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/emc-api.pid"
           for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:8080/health > /dev/null; then
+            if curl --fail --silent http://127.0.0.1:8080/api/health > /dev/null; then
               exit 0
             fi
             sleep 1
@@ -130,7 +130,7 @@ jobs:
             ./tests/e2e-local.ps1 `
               -AdminUsername emcaudit `
               -AdminPassword 'EMC-Release-Audit-2026!' `
-              -BaseUrl http://127.0.0.1:8080 `
+              -BaseUrl http://127.0.0.1:8080/api `
               -MySqlClient mysql `
               -MySqlHost 127.0.0.1 `
               -CurlClient curl

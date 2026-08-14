@@ -6,7 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["public/build/**", "node_modules/**", "vendor/**"] },
   js.configs.recommended,
   {
     files: ["**/*.{js,jsx}"],
