@@ -11,7 +11,6 @@ Fill this in before the final `v1.0.0` release. Do not include hosting passwords
 - Opening days/hours — Myanmar:
 - Pickup/service townships:
 - Pickup instructions or limits:
-- Pickup fee in Ks (`0` if free):
 
 ## Packages
 

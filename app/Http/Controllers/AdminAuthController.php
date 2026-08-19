@@ -32,7 +32,9 @@ class AdminAuthController extends ApiController
         }
         $admin->last_login_at = now();
         $admin->save();
-        Auth::guard('admin')->login($admin);
+        $guard = Auth::guard('admin');
+        $guard->setRememberDuration(max(1, (int) config('emc.admin_remember_days', 30)) * 1440);
+        $guard->login($admin, $request->boolean('remember', true));
         $request->session()->regenerate();
         RateLimiter::clear($key);
 

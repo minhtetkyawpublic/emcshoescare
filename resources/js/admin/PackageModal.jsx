@@ -15,10 +15,8 @@ function PackageModal({ packageItem, t, onClose, onSaved }) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const details = {
-      nameEn: form.get("nameEn"),
-      nameMm: form.get("nameMm"),
-      descriptionEn: form.get("descriptionEn"),
-      descriptionMm: form.get("descriptionMm"),
+      name: form.get("name"),
+      description: form.get("description"),
       priceKs: Number(form.get("priceKs")),
       sortOrder: Number(form.get("sortOrder")),
       active: form.get("active") === "on",
@@ -43,10 +41,8 @@ function PackageModal({ packageItem, t, onClose, onSaved }) {
         <h2 id="package-modal-title">{editing ? t.editPackage : t.createPackage}</h2>
         <form onSubmit={submit}>
           <div className="admin-field-grid">
-            <label><span>{t.packageNameEn}</span><input name="nameEn" defaultValue={packageItem?.nameEn || ""} required /></label>
-            <label><span>{t.packageNameMm}</span><input name="nameMm" defaultValue={packageItem?.nameMm || ""} required /></label>
-            <label className="wide"><span>{t.descriptionEn}</span><textarea name="descriptionEn" rows="2" defaultValue={packageItem?.descriptionEn || ""} /></label>
-            <label className="wide"><span>{t.descriptionMm}</span><textarea name="descriptionMm" rows="2" defaultValue={packageItem?.descriptionMm || ""} /></label>
+            <label className="wide"><span>{t.packageName}</span><input name="name" defaultValue={packageItem?.name || ""} required /></label>
+            <label className="wide"><span>{t.description}</span><textarea name="description" rows="3" defaultValue={packageItem?.description || ""} /></label>
             <label><span>{t.priceKs}</span><input name="priceKs" type="number" min="0" step="500" defaultValue={packageItem?.priceKs ?? 0} required /></label>
             <label><span>{t.sortOrder}</span><input name="sortOrder" type="number" min="0" defaultValue={packageItem?.sortOrder ?? 10} required /></label>
           </div>

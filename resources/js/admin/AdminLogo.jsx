@@ -4,8 +4,8 @@ const emcIcon = `${appBaseFromModuleUrl(import.meta.url)}/emcicon.jpg`;
 
 function AdminLogo() {
   return (
-    <div className="admin-logo">
-      <span><img src={emcIcon} alt="" /></span>
+    <div className="admin-logo brand-lockup">
+      <span className="logo-frame"><img src={emcIcon} alt="EMC" /></span>
       <div><strong>EMC</strong><small>Shoes Care Myanmar</small></div>
     </div>
   );

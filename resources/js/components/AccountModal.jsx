@@ -17,7 +17,7 @@ function translatedError(error, t) {
   return messages[error?.code] || t.accountUnavailable;
 }
 
-function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated, onProfileUpdate, onLogout, onUnreadChange }) {
+function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated, onProfileUpdate, onLogout, onUnreadChange, embedded = false, mobileSection = "all" }) {
   const [mode, setMode] = useState(customer ? "profile" : initialMode || "login");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,14 +29,19 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   const [ordersError, setOrdersError] = useState("");
   const modalRef = useRef(null);
 
-  useDialogFocus(modalRef, onClose, busy, "[data-initial-focus]");
+  useDialogFocus(modalRef, onClose, busy, "[data-initial-focus]", !embedded);
 
   useEffect(() => {
-    modalRef.current?.querySelector("[data-initial-focus]")?.focus();
-  }, [mode]);
+    if (!embedded) modalRef.current?.querySelector("[data-initial-focus]")?.focus();
+  }, [embedded, mode]);
 
   useEffect(() => {
-    if (!customer) return;
+    if (embedded) setMode(customer ? "profile" : initialMode || "login");
+    else if (customer) setMode("profile");
+  }, [customer, embedded, initialMode]);
+
+  useEffect(() => {
+    if (!customer || (embedded && mobileSection !== "activity")) return;
     let active = true;
     accountApi.orders()
       .then((data) => {
@@ -48,7 +53,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
       .catch(() => { if (active) setOrdersError(t.ordersLoadError); })
       .finally(() => { if (active) setOrdersLoading(false); });
     return () => { active = false; };
-  }, [customer, onUnreadChange, t.ordersLoadError]);
+  }, [customer, embedded, mobileSection, onUnreadChange, t.ordersLoadError]);
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -148,17 +153,20 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
     if (event.target === event.currentTarget && !busy) onClose();
   };
 
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={closeFromBackdrop}>
-      <section ref={modalRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby="account-title" tabIndex="-1">
-        <button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label={t.close}><X /></button>
-        <div className="account-brand"><span><img src={emcIcon} alt="" /></span><strong>EMC</strong></div>
+  const accountTitleId = embedded ? `mobile-${mobileSection}-account-title` : "account-title";
+  const ordersTitleId = embedded ? `mobile-${mobileSection}-orders-title` : "my-orders-heading";
+
+  const accountContent = (
+      <section ref={modalRef} className={embedded ? "account-modal embedded" : "account-modal"} role={embedded ? "region" : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby={embedded && mobileSection === "activity" ? ordersTitleId : accountTitleId} tabIndex="-1">
+        {!embedded && <button className="modal-close" type="button" onClick={onClose} disabled={busy} aria-label={t.close}><X /></button>}
+        {!embedded && <div className="account-brand"><span><img src={emcIcon} alt="" /></span><strong>EMC</strong></div>}
 
         {mode === "profile" ? (
           <>
+            {mobileSection !== "activity" && <>
             <div className="account-heading">
               <p className="eyebrow"><UserRound size={15} />{t.account}</p>
-              <h2 id="account-title">{t.profileTitle}</h2>
+              <h2 id={accountTitleId}>{t.profileTitle}</h2>
               <p>{t.profileIntro}</p>
             </div>
             <form className="account-form" onSubmit={submitProfile}>
@@ -169,9 +177,11 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
               {success && <p className="account-success" role="status"><Check size={16} />{success}</p>}
               <button className="primary-button account-submit" disabled={busy}>{busy ? t.savingProfile : t.saveProfile}<ArrowRight size={17} /></button>
             </form>
+            </>}
+            {mobileSection !== "account" && <>
             <div className="account-divider" />
-            <section className="account-orders" aria-labelledby="my-orders-heading">
-              <div className="account-orders-heading"><div><span>{t.orderHistory}</span><h3 id="my-orders-heading">{t.myOrders}</h3></div><span>{orders.length}</span></div>
+            <section className="account-orders" aria-labelledby={ordersTitleId}>
+              <div className="account-orders-heading"><div><span>{t.orderHistory}</span><h3 id={ordersTitleId}>{t.myOrders}</h3></div><span>{orders.length}</span></div>
               {ordersLoading && <p className="orders-empty">{t.loadingOrders}</p>}
               {!ordersLoading && orders.length === 0 && <p className="orders-empty">{t.noOrdersYet}</p>}
               {ordersError && <p className="account-error" role="alert">{ordersError}</p>}
@@ -180,7 +190,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
                   <div className={selectedOrder?.id === order.id ? "customer-order active" : "customer-order"} key={order.id}>
                     <button type="button" onClick={() => openOrder(order.id)}>
                       <span className={order.unreadStatus ? "order-list-icon unread" : "order-list-icon"}>{order.unreadStatus ? <Bell /> : <CalendarDays />}</span>
-                      <span><strong>{order.orderNumber}</strong><small>{isMyanmar ? order.package.nameMm : order.package.nameEn} · {orderDate(order.createdAt)}</small></span>
+                      <span><strong>{order.orderNumber}</strong><small>{order.package.name} · {orderDate(order.createdAt)}</small></span>
                       <span className="order-list-end">{order.unreadStatus && <b>{t.newUpdate}</b>}<em className={`status-${order.status}`}>{statusLabel(order.status, t)}</em><ChevronRight /></span>
                     </button>
                     {selectedOrder?.id === order.id && (
@@ -204,8 +214,11 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
                 ))}
               </div>
             </section>
+            </>}
+            {mobileSection !== "activity" && <>
             <div className="account-divider" />
             <button className="logout-button" type="button" onClick={logout} disabled={busy}><LogOut size={17} />{busy ? t.loggingOut : t.logout}</button>
+            </>}
           </>
         ) : (
           <>
@@ -215,7 +228,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
             </div>
             <div className="account-heading">
               <p className="eyebrow"><LockKeyhole size={15} />{t.noOtp}</p>
-              <h2 id="account-title">{mode === "login" ? t.accountWelcome : t.createAccount}</h2>
+              <h2 id={accountTitleId}>{mode === "login" ? t.accountWelcome : t.createAccount}</h2>
               <p>{mode === "login" ? t.accountIntro : t.registerIntro}</p>
             </div>
             <form className="account-form" onSubmit={submitAuth}>
@@ -236,8 +249,11 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
           </>
         )}
       </section>
-    </div>
   );
+
+  if (embedded) return <div className={`mobile-account-screen ${mobileSection}`}>{accountContent}</div>;
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={closeFromBackdrop}>{accountContent}</div>;
 }
 
 export default AccountModal;

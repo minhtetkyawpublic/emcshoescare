@@ -63,9 +63,6 @@ export const accountApi = {
   packages() {
     return request("/packages");
   },
-  settings() {
-    return request("/settings");
-  },
   createOrder(formData) {
     return request("/orders", { method: "POST", body: formData });
   },

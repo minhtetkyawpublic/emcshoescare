@@ -6,7 +6,7 @@ import "./styles.css";
 import "./admin.css";
 import { appBaseFromModuleUrl } from "./api/baseUrl";
 
-const isAdminRoute = /\/admin\/?$/.test(window.location.pathname);
+const isAdminRoute = /\/admin(?:\/(?:orders|packages|reports))?\/?$/.test(window.location.pathname);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

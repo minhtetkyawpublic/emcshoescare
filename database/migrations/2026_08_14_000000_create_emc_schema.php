@@ -43,21 +43,13 @@ return new class extends Migration
         Schema::create('packages', function (Blueprint $table) {
             $table->id();
             $table->string('slug', 80)->unique();
-            $table->string('name_en', 120);
-            $table->string('name_mm', 180);
-            $table->string('description_en', 500)->default('');
-            $table->string('description_mm', 800)->default('');
+            $table->string('name', 180);
+            $table->string('description', 1000)->default('');
             $table->unsignedBigInteger('price_ks');
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
             $table->index(['is_active', 'sort_order', 'id']);
-        });
-
-        Schema::create('shop_settings', function (Blueprint $table) {
-            $table->string('setting_key', 80)->primary();
-            $table->string('setting_value', 500);
-            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
         });
 
         Schema::create('orders', function (Blueprint $table) {
@@ -67,10 +59,8 @@ return new class extends Migration
             $table->char('storage_key', 32)->unique();
             $table->foreignId('customer_id')->constrained()->restrictOnDelete();
             $table->foreignId('package_id')->constrained()->restrictOnDelete();
-            $table->string('package_name_en', 120);
-            $table->string('package_name_mm', 180);
+            $table->string('package_name', 180);
             $table->unsignedBigInteger('package_price_ks');
-            $table->unsignedBigInteger('pickup_fee_ks')->default(0);
             $table->unsignedBigInteger('total_price_ks');
             $table->string('fulfillment_method', 20);
             $table->string('customer_name', 120);
@@ -83,6 +73,11 @@ return new class extends Migration
             $table->unique(['customer_id', 'client_request_id']);
             $table->index(['customer_id', 'created_at']);
             $table->index(['status', 'created_at']);
+            $table->index(['created_at', 'id'], 'orders_created_id_index');
+            $table->index(['package_id', 'created_at'], 'orders_package_created_index');
+            $table->index(['fulfillment_method', 'created_at'], 'orders_handover_created_index');
+            $table->index('customer_phone', 'orders_customer_phone_index');
+            $table->index('customer_name', 'orders_customer_name_index');
         });
 
         Schema::create('order_photos', function (Blueprint $table) {
@@ -118,7 +113,6 @@ return new class extends Migration
         Schema::dropIfExists('order_status_history');
         Schema::dropIfExists('order_photos');
         Schema::dropIfExists('orders');
-        Schema::dropIfExists('shop_settings');
         Schema::dropIfExists('packages');
         Schema::dropIfExists('sessions');
         Schema::dropIfExists('admins');

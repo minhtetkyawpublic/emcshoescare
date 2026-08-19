@@ -14,7 +14,7 @@ Use this document on the staging site after real shop content is loaded. Record 
 
 ## Content approval
 
-Complete `docs/CONTENT_WORKSHEET.md`, enter the approved packages and pickup fee in `/admin`, then verify:
+Complete `docs/CONTENT_WORKSHEET.md`, enter the approved packages in `/admin`, then verify:
 
 - [ ] Shop name is **EMC Shoes Care Myanmar** and installed short name is **EMC**.
 - [ ] Phone, address, opening hours, service area, and pickup rules match the approved worksheet.
@@ -49,13 +49,16 @@ Use a new test phone number and real sample shoe photos. Do not reuse a customer
 
 - [ ] Register with phone number and password without OTP.
 - [ ] Leave **Remember me** enabled, close all browser windows, reopen the staging URL, and confirm the same account remains signed in.
-- [ ] Choose an active fixed-price package and customer drop-off; confirm pickup fee is `0` for this order.
+- [ ] Choose an active fixed-price package and customer drop-off; confirm the order total equals the package price.
 - [ ] Upload exactly ten different photos, confirm usable previews, and submit once.
 - [ ] Confirm only one order exists after refreshing/retrying the result page.
 - [ ] Staff can open the order and all ten photos in `/admin`.
+- [ ] With admin **Remember me** enabled, close and reopen the browser and confirm the same administrator remains signed in; explicit sign-out must remove access.
+- [ ] Staff can find the order by number, phone, status, package, handover method, and submission date, and can move between result pages.
+- [ ] The Reports screen shows matching totals and status/package/day breakdowns for the test period.
 - [ ] Staff advances the drop-off order through Confirmed → Shoes received → Repairing → Ready → Done, adding a meaningful customer note each time.
 - [ ] Customer sees every status, timestamp, note, and unread indicator, then opening the order clears the unread indicator.
-- [ ] Create a second order with pickup and confirm the configured pickup fee is added once to the fixed package price.
+- [ ] Create a second order with pickup and confirm the order total still equals the fixed package price.
 - [ ] Staff advances it through Confirmed → Pickup scheduled → Rider on the way → Shoes received → Repairing → Ready → Done.
 - [ ] No payment request, payment button, or payment status appears anywhere.
 
@@ -82,7 +85,7 @@ Notes or evidence links:
 
 - [ ] Production uses HTTPS with the final domain and no browser certificate warning.
 - [ ] `EMC_APP_ENV=production`, a unique 32+ character `EMC_APP_KEY`, the exact HTTPS origin, and a dedicated password-protected non-root MySQL account are configured outside Git.
-- [ ] All four migrations are recorded and the single administrator can sign in.
+- [ ] All migrations are recorded and the single administrator can sign in.
 - [ ] Upload permissions work, while direct photo-directory access is denied.
 - [ ] An encrypted off-site backup schedule is enabled and its latest run/checksum is recorded.
 - [ ] A backup is restored into an isolated database and the expected tables, migrations, packages, and a private photo are verified.

@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ArrowRight, Box, CheckCircle2, Clock3, Image, MapPin, Phone, UserRound, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Box, CheckCircle2, Clock3, Image, MapPin, Phone, UserRound, X } from "lucide-react";
 import { adminApi } from "../api/adminClient";
 import { apiUrl } from "../api/client";
 import { localizedStatusNote, statusLabel } from "../orderStatus";
@@ -7,19 +7,20 @@ import { adminDateTime, adminPrice } from "./utils";
 import useDialogFocus from "../components/useDialogFocus";
 
 function OrderModal({ order, language, t, onClose, onUpdated }) {
-  const packageName = language === "mm" ? order.package.nameMm : order.package.nameEn;
+  const packageName = order.package.name;
   const dialogRef = useRef(null);
   const [nextStatus, setNextStatus] = useState(order.nextStatuses[0] || "");
   const [noteEn, setNoteEn] = useState("");
   const [noteMm, setNoteMm] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useDialogFocus(dialogRef, onClose, busy);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(null);
+  useDialogFocus(dialogRef, onClose, busy, "", activePhotoIndex === null);
 
   const updateStatus = async (event) => {
     event.preventDefault();
-    if (!nextStatus || (!noteEn.trim() && !noteMm.trim())) {
-      setMessage(t.statusNoteRequired);
+    if (!nextStatus) {
+      setMessage(t.invalidStatusTransition);
       return;
     }
     setBusy(true);
@@ -32,7 +33,7 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
       setBusy(false);
       onUpdated(data.order);
     } catch (error) {
-      setMessage(error?.code === "invalid_status_transition" ? t.invalidStatusTransition : error?.code === "status_note_required" ? t.statusNoteRequired : t.adminUnavailable);
+      setMessage(error?.code === "invalid_status_transition" ? t.invalidStatusTransition : t.adminUnavailable);
       setBusy(false);
     }
   };
@@ -43,13 +44,13 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
         <button className="admin-modal-close" onClick={onClose} aria-label={t.close}><X /></button>
         <span className="admin-section-kicker">{t.orderDetails}</span>
         <div className="order-modal-title"><div><h2 id="order-modal-title">{order.orderNumber}</h2><p>{adminDateTime(order.createdAt, language)}</p></div><em className={`status-${order.status}`}>{statusLabel(order.status, t)}</em></div>
-        <div className="admin-order-total"><span>{packageName}<small>{adminPrice(order.package.priceKs, language)} {t.ks}{order.pickupFeeKs > 0 ? ` + ${adminPrice(order.pickupFeeKs, language)} ${t.ks}` : ""}</small></span><strong>{adminPrice(order.totalPriceKs, language)} {t.ks}</strong></div>
+        <div className="admin-order-total"><span>{packageName}<small>{adminPrice(order.package.priceKs, language)} {t.ks}</small></span><strong>{adminPrice(order.totalPriceKs, language)} {t.ks}</strong></div>
         <div className="order-info-grid">
           <div><span><UserRound /></span><div><small>{t.customerDetails}</small><strong>{order.customer.name}</strong><p><Phone />{order.customer.phone}</p><p><MapPin />{order.customer.address}</p></div></div>
-          <div><span><Box /></span><div><small>{t.handoverLabel}</small><strong>{order.handover === "pickup" ? t.pickup : t.dropoff}</strong><p>{order.pickupFeeKs > 0 ? `${t.pickupFeeLabel}: ${adminPrice(order.pickupFeeKs, language)} ${t.ks}` : t.submitNote}</p></div></div>
+          <div><span><Box /></span><div><small>{t.handoverLabel}</small><strong>{order.handover === "pickup" ? t.pickup : t.dropoff}</strong><p>{order.handover === "pickup" ? t.pickupBody : t.dropoffBody}</p></div></div>
         </div>
         <div className="admin-order-notes"><small>{t.orderNotes}</small><p>{order.notes || "—"}</p></div>
-        <div className="admin-order-photos"><small>{t.photosSection} · {order.photos.length}</small><div>{order.photos.map((photo, index) => <a key={photo.id} href={apiUrl(photo.url)} target="_blank" rel="noreferrer"><img src={apiUrl(photo.url)} alt={`${t.photosSection} ${index + 1}`} /></a>)}{order.photos.length === 0 && <span><Image />{t.noPhotos}</span>}</div></div>
+        <div className="admin-order-photos"><small>{t.photosSection} · {order.photos.length}</small><div>{order.photos.map((photo, index) => <button type="button" key={photo.id} onClick={() => setActivePhotoIndex(index)} aria-label={`${t.viewPhoto} ${index + 1}`}><img src={apiUrl(photo.url)} alt={`${t.photosSection} ${index + 1}`} /></button>)}{order.photos.length === 0 && <span><Image />{t.noPhotos}</span>}</div></div>
         <section className="admin-status-section">
           <div className="admin-status-heading"><span><Clock3 /></span><div><small>{t.statusUpdate}</small><h3>{t.orderTimeline}</h3></div></div>
           <div className="admin-status-timeline">
@@ -67,6 +68,52 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
             <button className="admin-primary" disabled={busy}>{busy ? t.saving : t.updateStatus}<ArrowRight /></button>
           </form>
         ) : <p className="terminal-order"><CheckCircle2 />{t.terminalOrder}</p>}
+      </section>
+      {activePhotoIndex !== null && <PhotoViewer photos={order.photos} activeIndex={activePhotoIndex} setActiveIndex={setActivePhotoIndex} t={t} />}
+    </div>
+  );
+}
+
+function PhotoViewer({ photos, activeIndex, setActiveIndex, t }) {
+  const viewerRef = useRef(null);
+  const touchStart = useRef(null);
+  const close = () => setActiveIndex(null);
+  const previous = () => setActiveIndex((activeIndex - 1 + photos.length) % photos.length);
+  const next = () => setActiveIndex((activeIndex + 1) % photos.length);
+  useDialogFocus(viewerRef, close, false, ".photo-viewer-close");
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "ArrowLeft" && photos.length > 1) {
+        event.preventDefault();
+        previous();
+      } else if (event.key === "ArrowRight" && photos.length > 1) {
+        event.preventDefault();
+        next();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  const finishSwipe = (event) => {
+    if (touchStart.current === null || photos.length < 2) return;
+    const distance = event.changedTouches[0].clientX - touchStart.current;
+    touchStart.current = null;
+    if (Math.abs(distance) < 45) return;
+    if (distance > 0) previous(); else next();
+  };
+
+  const photo = photos[activeIndex];
+  return (
+    <div className="photo-viewer-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+      <section ref={viewerRef} className="photo-viewer" role="dialog" aria-modal="true" aria-label={t.photoViewer} tabIndex="-1">
+        <header><strong>{t.photoViewer}</strong><span>{activeIndex + 1} / {photos.length}</span><button type="button" className="photo-viewer-close" onClick={close} aria-label={t.close}><X /></button></header>
+        <div className="photo-viewer-stage" onTouchStart={(event) => { touchStart.current = event.touches[0].clientX; }} onTouchEnd={finishSwipe}>
+          <img src={apiUrl(photo.url)} alt={`${t.photosSection} ${activeIndex + 1}`} />
+          {photos.length > 1 && <><button type="button" className="photo-viewer-previous" onClick={previous} aria-label={t.previousPhoto}><ArrowLeft /></button><button type="button" className="photo-viewer-next" onClick={next} aria-label={t.nextPhoto}><ArrowRight /></button></>}
+        </div>
+        {photos.length > 1 && <div className="photo-viewer-thumbnails">{photos.map((item, index) => <button type="button" className={index === activeIndex ? "active" : ""} key={item.id} onClick={() => setActiveIndex(index)} aria-label={`${t.viewPhoto} ${index + 1}`} aria-current={index === activeIndex ? "true" : undefined}><img src={apiUrl(item.url)} alt="" /></button>)}</div>}
       </section>
     </div>
   );

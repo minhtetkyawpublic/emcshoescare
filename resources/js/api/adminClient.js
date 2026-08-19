@@ -2,6 +2,15 @@ import { ApiError, apiUrl } from "./client";
 
 let adminCsrfToken = "";
 
+function queryString(values = {}) {
+  const query = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== "" && value !== null && value !== undefined) query.set(key, String(value));
+  });
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
 async function adminRequest(path, options = {}) {
   const response = await fetch(apiUrl(path), {
     ...options,
@@ -52,19 +61,16 @@ export const adminApi = {
   archivePackage(id) {
     return adminRequest(`/admin/packages/${id}`, { method: "DELETE" });
   },
-  settings() {
-    return adminRequest("/admin/settings");
-  },
-  updateSettings(details) {
-    return adminRequest("/admin/settings", { method: "PUT", body: JSON.stringify(details) });
-  },
-  orders() {
-    return adminRequest("/admin/orders");
+  orders(filters = {}) {
+    return adminRequest(`/admin/orders${queryString(filters)}`);
   },
   order(id) {
     return adminRequest(`/admin/orders/${id}`);
   },
   updateOrderStatus(id, details) {
     return adminRequest(`/admin/orders/${id}/status`, { method: "PUT", body: JSON.stringify(details) });
+  },
+  report(filters = {}) {
+    return adminRequest(`/admin/reports${queryString(filters)}`);
   },
 };

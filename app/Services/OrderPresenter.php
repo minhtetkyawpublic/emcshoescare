@@ -35,8 +35,7 @@ class OrderPresenter
         return [
             'id' => $order->id,
             'orderNumber' => $order->order_number,
-            'package' => ['id' => $order->package_id, 'nameEn' => $order->package_name_en, 'nameMm' => $order->package_name_mm, 'priceKs' => $order->package_price_ks],
-            'pickupFeeKs' => $order->pickup_fee_ks,
+            'package' => ['id' => $order->package_id, 'name' => $order->package_name, 'priceKs' => $order->package_price_ks],
             'totalPriceKs' => $order->total_price_ks,
             'handover' => $order->fulfillment_method,
             'customer' => ['name' => $order->customer_name, 'phone' => $order->customer_phone, 'address' => $order->customer_address],

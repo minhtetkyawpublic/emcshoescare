@@ -48,9 +48,10 @@ php /home/u608908096/domains/k2softwarestudio.com/public_html/emcshoescare/artis
 
 - Keep exactly one active administrator unless EMC explicitly changes the role model.
 - Review submitted orders daily and move statuses only through the choices offered by the app.
+- Use the server-side Orders filters and pagination instead of exporting or loading the complete order history.
+- Use Reports for periods up to 366 days; narrow by package when reviewing package performance.
 - Write at least one clear English or Myanmar note for every change; both are preferred.
 - Keep package prices fixed for existing orders. Editing a package affects future orders only.
-- Set pickup fee to `0` when pickup is free. The fee applies only to pickup orders.
 - Hide obsolete packages instead of altering old order records.
 - Reset the admin password from the server CLI if access is lost.
 

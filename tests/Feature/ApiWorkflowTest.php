@@ -8,6 +8,7 @@ use App\Providers\AppServiceProvider;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -42,12 +43,20 @@ class ApiWorkflowTest extends TestCase
         $this->actingAs(Customer::firstOrFail(), 'customer');
 
         $package = $this->getJson('/api/packages')->assertOk()->json('data.packages.0');
+        $this->assertArrayHasKey('name', $package);
+        $this->assertArrayHasKey('description', $package);
+        $this->assertArrayNotHasKey('nameEn', $package);
+        $this->assertArrayNotHasKey('nameMm', $package);
         $requestId = '123e4567-e89b-42d3-a456-426614174000';
         $created = $this->post('/api/orders', [
             'clientRequestId' => $requestId, 'packageId' => $package['id'], 'fullName' => 'EMC Customer',
             'address' => 'Yangon', 'notes' => 'Repair the sole', 'handover' => 'pickup', 'photos' => [$this->photo()],
         ], ['X-CSRF-TOKEN' => session()->token(), 'Accept' => 'application/json']);
-        $created->assertCreated()->assertJsonPath('data.order.status', 'submitted')->assertJsonPath('data.order.photoCount', 1);
+        $created->assertCreated()
+            ->assertJsonPath('data.order.status', 'submitted')
+            ->assertJsonPath('data.order.photoCount', 1)
+            ->assertJsonPath('data.order.totalPriceKs', $package['priceKs']);
+        $this->assertArrayNotHasKey('pickupFeeKs', $created->json('data.order'));
         $orderId = $created->json('data.order.id');
 
         $this->post('/api/orders', [
@@ -57,12 +66,44 @@ class ApiWorkflowTest extends TestCase
 
         Admin::create(['username' => 'emcadmin', 'password_hash' => Hash::make('AdminPass123!'), 'display_name' => 'EMC Admin', 'is_active' => true]);
         $adminSession = $this->getJson('/api/admin/auth/session');
-        $this->withHeader('X-CSRF-TOKEN', $adminSession->json('data.csrfToken'))->postJson('/api/admin/auth/login', ['username' => 'emcadmin', 'password' => 'AdminPass123!'])->assertOk();
+        $adminLogin = $this->withHeader('X-CSRF-TOKEN', $adminSession->json('data.csrfToken'))->postJson('/api/admin/auth/login', ['username' => 'emcadmin', 'password' => 'AdminPass123!', 'remember' => true]);
+        $adminLogin->assertOk()->assertCookie(Auth::guard('admin')->getRecallerName());
+        $this->assertNotNull(Admin::firstOrFail()->remember_token);
         $this->actingAs(Admin::firstOrFail(), 'admin');
+        $packageCreated = $this->withHeader('X-CSRF-TOKEN', session()->token())->postJson('/api/admin/packages', [
+            'name' => 'Single Content Package', 'description' => 'One admin-managed description.',
+            'priceKs' => 18000, 'sortOrder' => 40, 'active' => true,
+        ])->assertCreated();
+        $managedPackageId = $packageCreated->json('data.id');
+        $this->getJson('/api/admin/packages')->assertOk()->assertJsonFragment([
+            'id' => $managedPackageId, 'name' => 'Single Content Package', 'description' => 'One admin-managed description.',
+        ]);
+        $this->withHeader('X-CSRF-TOKEN', session()->token())->putJson("/api/admin/packages/{$managedPackageId}", [
+            'name' => 'Admin Wording', 'description' => 'မြန်မာ သို့မဟုတ် English စာသားရေးနိုင်သည်။',
+            'priceKs' => 20000, 'sortOrder' => 40, 'active' => true,
+        ])->assertOk();
         $this->getJson("/api/admin/orders/{$orderId}")->assertOk()->assertJsonPath('data.order.orderNumber', $created->json('data.order.orderNumber'));
+        $this->getJson('/api/admin/orders?status=submitted&perPage=10&page=1')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.pagination.perPage', 10)
+            ->assertJsonPath('data.orders.0.id', $orderId);
+        $this->getJson('/api/admin/orders?search=0912345')
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1);
+        $today = now()->toDateString();
+        $this->getJson("/api/admin/reports?from={$today}&to={$today}")
+            ->assertOk()
+            ->assertJsonPath('data.summary.totalOrders', 1)
+            ->assertJsonPath('data.summary.revenueKs', $package['priceKs'])
+            ->assertJsonPath('data.byStatus.0.status', 'submitted');
 
         foreach (['confirmed', 'pickup_scheduled', 'rider_on_way', 'shoes_received', 'repairing', 'ready', 'done'] as $status) {
-            $this->withHeader('X-CSRF-TOKEN', session()->token())->putJson("/api/admin/orders/{$orderId}/status", ['status' => $status, 'noteEn' => "Changed to {$status}"])->assertOk()->assertJsonPath('data.order.status', $status);
+            $payload = ['status' => $status];
+            if ($status !== 'confirmed') {
+                $payload['noteEn'] = "Changed to {$status}";
+            }
+            $this->withHeader('X-CSRF-TOKEN', session()->token())->putJson("/api/admin/orders/{$orderId}/status", $payload)->assertOk()->assertJsonPath('data.order.status', $status);
         }
         $this->getJson('/api/orders')->assertOk()->assertJsonPath('data.orders.0.unreadStatus', true);
         $this->postJson("/api/orders/{$orderId}/seen")->assertOk();
@@ -81,6 +122,11 @@ class ApiWorkflowTest extends TestCase
     {
         $this->get('/')->assertOk()->assertSee('<div id="root"></div>', false)->assertSee('/build/assets/', false);
         $this->get('/admin')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/admin/orders')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/admin/packages')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/admin/reports')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->getJson('/api/settings')->assertNotFound()->assertJsonPath('error.code', 'not_found');
+        $this->getJson('/api/admin/settings')->assertNotFound()->assertJsonPath('error.code', 'not_found');
         $this->getJson('/api/not-a-route')->assertNotFound()->assertJsonPath('error.code', 'not_found');
     }
 }

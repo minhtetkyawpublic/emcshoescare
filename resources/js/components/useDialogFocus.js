@@ -2,13 +2,14 @@ import { useEffect, useRef } from "react";
 
 const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
-export default function useDialogFocus(dialogRef, onClose, closeDisabled = false, initialSelector = "") {
+export default function useDialogFocus(dialogRef, onClose, closeDisabled = false, initialSelector = "", enabled = true) {
   const closeRef = useRef(onClose);
   const disabledRef = useRef(closeDisabled);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => { disabledRef.current = closeDisabled; }, [closeDisabled]);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const previousFocus = document.activeElement;
     const dialog = dialogRef.current;
     document.body.classList.add("modal-open");
@@ -48,5 +49,5 @@ export default function useDialogFocus(dialogRef, onClose, closeDisabled = false
       window.removeEventListener("keydown", handleKeyDown);
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-  }, [dialogRef, initialSelector]);
+  }, [dialogRef, initialSelector, enabled]);
 }

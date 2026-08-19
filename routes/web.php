@@ -4,7 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminOrderController;
 use App\Http\Controllers\AdminPackageController;
-use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PublicController;
 use Illuminate\Support\Facades\Route;
@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('api')->middleware('api.headers')->group(function () {
     Route::get('/health', [PublicController::class, 'health']);
     Route::get('/packages', [PublicController::class, 'packages']);
-    Route::get('/settings', [PublicController::class, 'settings']);
 
     Route::get('/auth/session', [AccountController::class, 'session']);
     Route::post('/auth/register', [AccountController::class, 'register'])->middleware('trusted.browser');
@@ -34,9 +33,8 @@ Route::prefix('api')->middleware('api.headers')->group(function () {
     Route::post('/admin/packages', [AdminPackageController::class, 'store'])->middleware('trusted.browser');
     Route::put('/admin/packages/{package}', [AdminPackageController::class, 'update'])->whereNumber('package')->middleware('trusted.browser');
     Route::delete('/admin/packages/{package}', [AdminPackageController::class, 'destroy'])->whereNumber('package')->middleware('trusted.browser');
-    Route::get('/admin/settings', [AdminSettingsController::class, 'show']);
-    Route::put('/admin/settings', [AdminSettingsController::class, 'update'])->middleware('trusted.browser');
     Route::get('/admin/orders', [AdminOrderController::class, 'index']);
+    Route::get('/admin/reports', [AdminReportController::class, 'show']);
     Route::get('/admin/orders/{order}', [AdminOrderController::class, 'show'])->whereNumber('order');
     Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->whereNumber('order')->middleware('trusted.browser');
 });

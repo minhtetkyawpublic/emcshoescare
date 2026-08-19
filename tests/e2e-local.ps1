@@ -24,8 +24,6 @@ $otherCustomerId = 0
 $orderId = 0
 $dropoffOrderId = 0
 $testPackageId = 0
-$originalPickupFee = 0
-$pickupFeeChanged = $false
 $storageRecords = @()
 
 function Assert-True([bool]$Condition, [string]$Message) {
@@ -61,37 +59,31 @@ try {
   Assert-True (Test-Path -LiteralPath $PhotoPath) 'The test photo exists.'
   $adminSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $adminBootstrap = Invoke-JsonApi 'GET' '/admin/auth/session' $adminSession
-  $adminLogin = Invoke-JsonApi 'POST' '/admin/auth/login' $adminSession @{ username = $AdminUsername; password = $AdminPassword } $adminBootstrap.data.csrfToken
+  $adminLogin = Invoke-JsonApi 'POST' '/admin/auth/login' $adminSession @{ username = $AdminUsername; password = $AdminPassword; remember = $true } $adminBootstrap.data.csrfToken
   $adminCsrf = $adminLogin.data.csrfToken
+  $adminRememberCookie = $adminSession.Cookies.GetCookies([Uri]$BaseUrl) | Where-Object { $_.Name -like 'remember_admin_*' } | Select-Object -First 1
+  Assert-True ($null -ne $adminRememberCookie -and $adminRememberCookie.Expires -gt [DateTime]::Now.AddDays(20)) 'Admin remember cookie persists for about 30 days.'
   $adminCheck = Invoke-JsonApi 'GET' '/admin/auth/session' $adminSession
   Assert-True $adminCheck.data.authenticated 'Admin session persists.'
   $adminCsrf = $adminCheck.data.csrfToken
   Write-Output 'PASS phase=admin-authentication'
 
-  $settings = Invoke-JsonApi 'GET' '/admin/settings' $adminSession
-  $originalPickupFee = [int]$settings.data.pickupFeeKs
-  $testPickupFee = $originalPickupFee + 500
-  $updatedSettings = Invoke-JsonApi 'PUT' '/admin/settings' $adminSession @{ pickupFeeKs = $testPickupFee } $adminCsrf
-  $adminCsrf = $updatedSettings.data.csrfToken
-  $pickupFeeChanged = $true
-  Assert-True ([int]$updatedSettings.data.pickupFeeKs -eq $testPickupFee) 'Pickup fee can be updated.'
-
   $createdPackage = Invoke-JsonApi 'POST' '/admin/packages' $adminSession @{
-    nameEn = 'Release Test Package'; nameMm = 'MM Release Test Package';
-    descriptionEn = 'Temporary release workflow package.'; descriptionMm = 'MM temporary release workflow package.';
+    name = 'Release Test Package';
+    description = 'Temporary release workflow package.';
     priceKs = 12345; sortOrder = 9999; active = $false
   } $adminCsrf
   $testPackageId = [int]$createdPackage.data.id
   $adminCsrf = $createdPackage.data.csrfToken
   $updatedPackage = Invoke-JsonApi 'PUT' "/admin/packages/$testPackageId" $adminSession @{
-    nameEn = 'Release Test Package Updated'; nameMm = 'MM Release Test Package Updated';
-    descriptionEn = 'Temporary release workflow package, updated.'; descriptionMm = 'MM temporary release workflow package, updated.';
+    name = 'Release Test Package Updated';
+    description = 'Temporary release workflow package, updated.';
     priceKs = 12500; sortOrder = 9999; active = $true
   } $adminCsrf
   $adminCsrf = $updatedPackage.data.csrfToken
   $archivedPackage = Invoke-JsonApi 'DELETE' "/admin/packages/$testPackageId" $adminSession $null $adminCsrf
   $adminCsrf = $archivedPackage.data.csrfToken
-  Write-Output 'PASS phase=package-and-settings-management'
+  Write-Output 'PASS phase=package-management'
 
   $customerSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $phone = '099' + (Get-Random -Minimum 1000000 -Maximum 9999999)
@@ -124,7 +116,8 @@ try {
   Assert-True $firstOrder.success "Order creation succeeds: $firstRaw"
   $orderId = [int]$firstOrder.data.order.id
   $customerCsrf = $firstOrder.data.csrfToken
-  Assert-True ([int]$firstOrder.data.order.pickupFeeKs -eq $testPickupFee) 'Pickup fee is included only in the pickup order.'
+  Assert-True ([int]$firstOrder.data.order.totalPriceKs -eq [int]$package.priceKs) 'Pickup does not add a surcharge to the package price.'
+  Assert-True ($null -eq $firstOrder.data.order.PSObject.Properties['pickupFeeKs']) 'Order responses do not expose a pickup fee field.'
   Assert-True ([int]$firstOrder.data.order.photoCount -eq 10) 'Order stores the maximum of ten photos.'
 
   $multipart[4] = "X-CSRF-Token: $customerCsrf"
@@ -144,7 +137,10 @@ try {
   Assert-True $dropoffOrder.success "Drop-off order creation succeeds: $dropoffRaw"
   $dropoffOrderId = [int]$dropoffOrder.data.order.id
   $customerCsrf = $dropoffOrder.data.csrfToken
-  Assert-True ([int]$dropoffOrder.data.order.pickupFeeKs -eq 0) 'Drop-off order does not include the optional pickup fee.'
+  Assert-True ([int]$dropoffOrder.data.order.totalPriceKs -eq [int]$package.priceKs) 'Drop-off order total equals the package price.'
+  $filteredOrders = Invoke-JsonApi 'GET' "/admin/orders?status=submitted&packageId=$($package.id)&perPage=10&page=1" $adminSession
+  Assert-True ([int]$filteredOrders.data.pagination.total -ge 2) 'Server-side order filters find both new orders.'
+  Assert-True ([int]$filteredOrders.data.pagination.perPage -eq 10) 'Order pagination respects the requested page size.'
   Write-Output 'PASS phase=order-creation-and-retry'
 
   $adminOrder = Invoke-JsonApi 'GET' "/admin/orders/$orderId" $adminSession
@@ -180,6 +176,10 @@ try {
   Assert-True ($orderDetail.data.order.history.Count -eq 8) 'Customer timeline contains submission plus seven admin updates.'
   $dropoffDetail = Invoke-JsonApi 'GET' "/orders/$dropoffOrderId" $customerSession
   Assert-True ($dropoffDetail.data.order.history.Count -eq 6) 'Drop-off timeline skips pickup and rider states.'
+  $reportDate = Get-Date -Format 'yyyy-MM-dd'
+  $report = Invoke-JsonApi 'GET' "/admin/reports?from=$reportDate&to=$reportDate&packageId=$($package.id)" $adminSession
+  Assert-True ([int]$report.data.summary.totalOrders -ge 2) 'The report includes both completed test orders.'
+  Assert-True ($report.data.byStatus.status -contains 'done') 'The report includes a completed-status breakdown.'
   $customerPhoto = Invoke-WebRequest -Uri "$BaseUrl/orders/$orderId/photos/$photoId" -WebSession $customerSession -UseBasicParsing
   Assert-True ($customerPhoto.StatusCode -eq 200) 'Owning customer can retrieve the private photo.'
   $customerPhotoCacheControl = ($customerPhoto.Headers['Cache-Control'] -join ',')
@@ -219,23 +219,13 @@ try {
   Assert-True (-not $seenOrder.unreadStatus -and -not $seenDropoff.unreadStatus) 'Customer can mark both status histories as read.'
   Write-Output 'PASS phase=unread-status-tracking'
 
-  $restoredSettings = Invoke-JsonApi 'PUT' '/admin/settings' $adminSession @{ pickupFeeKs = $originalPickupFee } $adminCsrf
-  $adminCsrf = $restoredSettings.data.csrfToken
-  $pickupFeeChanged = $false
   Invoke-JsonApi 'POST' '/auth/logout' $customerSession $null $customerCsrf | Out-Null
-  Invoke-JsonApi 'POST' '/admin/auth/logout' $adminSession $null $adminCsrf | Out-Null
 
   Write-Output "PASS customer=$customerId pickupOrder=$orderId dropoffOrder=$dropoffOrderId package=$testPackageId pickupPhotos=10 pickupHistory=8 dropoffHistory=6 crossAccount=protected privatePhoto=no-store duplicateCount=1"
 }
 finally {
-  if ($adminSession -and $adminCsrf) {
-    try { Invoke-JsonApi 'POST' '/admin/auth/logout' $adminSession $null $adminCsrf | Out-Null } catch { }
-  }
   $mysql = Get-Command $MySqlClient -ErrorAction SilentlyContinue
   if ($mysql) {
-    if ($pickupFeeChanged) {
-      Invoke-TestMySql @('-D', $DatabaseName, '-e', "UPDATE shop_settings SET setting_value='$originalPickupFee' WHERE setting_key='pickup_fee_ks';") | Out-Null
-    }
     $cleanupOrderIds = @($orderId, $dropoffOrderId) | Where-Object { $_ -gt 0 }
     foreach ($cleanupOrderId in $cleanupOrderIds) {
       $photoRows = Invoke-TestMySql @('-N', '-B', '-D', $DatabaseName, '-e', "SELECT o.storage_key,p.storage_name FROM orders o INNER JOIN order_photos p ON p.order_id=o.id WHERE o.id=$cleanupOrderId;")
@@ -252,7 +242,6 @@ finally {
     if ($testPackageId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM packages WHERE id=$testPackageId;") | Out-Null }
     if ($customerId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM customers WHERE id=$customerId;") | Out-Null }
     if ($otherCustomerId -gt 0) { Invoke-TestMySql @('-D', $DatabaseName, '-e', "DELETE FROM customers WHERE id=$otherCustomerId;") | Out-Null }
-    Invoke-TestMySql @('-D', $DatabaseName, '-e', 'DELETE FROM sessions;') | Out-Null
   }
   foreach ($storageRecord in $storageRecords) {
     $root = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $PSScriptRoot) 'storage\app\private\order-photos'))

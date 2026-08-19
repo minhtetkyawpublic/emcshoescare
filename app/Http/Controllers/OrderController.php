@@ -126,20 +126,17 @@ class OrderController extends ApiController
             $validated[] = compact('photo', 'index', 'mime', 'dimensions') + ['extension' => $allowed[$mime]];
         }
 
-        $pickupFee = $handover === 'pickup'
-            ? max(0, (int) (DB::table('shop_settings')->where('setting_key', 'pickup_fee_ks')->value('setting_value') ?? 0))
-            : 0;
         $storageKey = bin2hex(random_bytes(16));
         $directory = "order-photos/{$storageKey}";
 
         try {
-            $order = DB::transaction(function () use ($customer, $package, $requestId, $name, $address, $notes, $handover, $pickupFee, $storageKey, $directory, $validated) {
+            $order = DB::transaction(function () use ($customer, $package, $requestId, $name, $address, $notes, $handover, $storageKey, $directory, $validated) {
                 $order = Order::create([
                     'order_number' => $this->number(), 'client_request_id' => $requestId, 'storage_key' => $storageKey,
                     'customer_id' => $customer->id, 'package_id' => $package->id,
-                    'package_name_en' => $package->name_en, 'package_name_mm' => $package->name_mm,
-                    'package_price_ks' => $package->price_ks, 'pickup_fee_ks' => $pickupFee,
-                    'total_price_ks' => $package->price_ks + $pickupFee, 'fulfillment_method' => $handover,
+                    'package_name' => $package->name,
+                    'package_price_ks' => $package->price_ks,
+                    'total_price_ks' => $package->price_ks, 'fulfillment_method' => $handover,
                     'customer_name' => $name, 'customer_phone' => $customer->phone, 'customer_address' => $address,
                     'customer_notes' => $notes, 'status' => 'submitted', 'customer_seen_at' => now(),
                 ]);

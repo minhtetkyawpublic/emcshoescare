@@ -1,11 +1,23 @@
 {
+  "resources/fonts/Manrope-Variable.ttf": {
+    "file": "assets/Manrope-Variable-FzEoaBTQ.ttf",
+    "src": "resources/fonts/Manrope-Variable.ttf"
+  },
+  "resources/fonts/NotoSansMyanmar-Variable.ttf": {
+    "file": "assets/NotoSansMyanmar-Variable-C_a5dthc.ttf",
+    "src": "resources/fonts/NotoSansMyanmar-Variable.ttf"
+  },
   "resources/js/main.jsx": {
-    "file": "assets/main-Bs18IHx3.js",
+    "file": "assets/main-Cv3TJhzV.js",
     "name": "main",
     "src": "resources/js/main.jsx",
     "isEntry": true,
     "css": [
-      "assets/main-Ce_17fKG.css"
+      "assets/main-CuLuMKg1.css"
+    ],
+    "assets": [
+      "assets/Manrope-Variable-FzEoaBTQ.ttf",
+      "assets/NotoSansMyanmar-Variable-C_a5dthc.ttf"
     ]
   }
 }

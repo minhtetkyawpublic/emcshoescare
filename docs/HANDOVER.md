@@ -17,9 +17,13 @@ If an upload stops, reconnect and retry. The unfinished request and compressed p
 
 The app has one administrator role. Open `/admin`, sign in, and use:
 
+On a private staff device, leave **Remember me** enabled to stay signed in for up to 30 days. Always sign out on a shared or lost device.
+
 - **Orders** to review contact details and private photos, then move the order through the offered next statuses.
 - **Packages** to add bilingual fixed-price packages, edit future-facing details, or hide a package.
-- **Settings** to set the optional pickup fee in Ks; use `0` for free pickup.
+- **Reports** to review order totals, order value, status breakdowns, package performance, and daily trends for a selected period.
+
+The Orders screen loads a limited page at a time. Staff can search by order number, customer, or phone and filter by status, package, handover method, or date without downloading the full order history.
 
 Pickup orders follow Submitted → Confirmed → Pickup scheduled → Rider on the way → Shoes received → Repairing → Ready → Done. Customer drop-off orders skip the pickup/rider states. Cancelled and Done orders are locked. Every status change requires an English or Myanmar note.
 

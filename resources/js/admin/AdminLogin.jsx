@@ -14,7 +14,7 @@ function AdminLogin({ language, setLanguage, t, onLogin }) {
     setBusy(true);
     setError("");
     try {
-      const result = await adminApi.login({ username: data.get("username"), password: data.get("password") });
+      const result = await adminApi.login({ username: data.get("username"), password: data.get("password"), remember: data.get("remember") === "on" });
       onLogin(result.admin);
     } catch (requestError) {
       setError(requestError?.code === "invalid_admin_credentials" ? t.invalidAdminCredentials : t.adminUnavailable);
@@ -34,6 +34,7 @@ function AdminLogin({ language, setLanguage, t, onLogin }) {
         <form onSubmit={submit}>
           <label><span>{t.username}</span><input name="username" autoComplete="username" placeholder={t.usernamePlaceholder} required /></label>
           <label><span>{t.password}</span><div className="admin-password"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder={t.adminPasswordPlaceholder} required /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? t.hidePassword : t.showPassword}>{showPassword ? <EyeOff /> : <Eye />}</button></div></label>
+          <label className="admin-remember"><input name="remember" type="checkbox" defaultChecked /><span><strong>{t.adminRememberMe}</strong><small>{t.adminRememberHint}</small></span></label>
           {error && <p className="admin-error" role="alert">{error}</p>}
           <button className="admin-primary" disabled={busy}>{busy ? t.adminSigningIn : t.adminSignIn}<ArrowRight /></button>
         </form>

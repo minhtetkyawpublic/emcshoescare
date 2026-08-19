@@ -6,7 +6,7 @@ import {
   CircleCheck,
   ClipboardList,
   Clock3,
-  House,
+  History,
   ImagePlus,
   Languages,
   Menu,
@@ -37,17 +37,12 @@ const fallbackPackages = packageDefinitions.map((pkg, index) => ({
   ...pkg,
   id: index + 1,
   priceKs: pkg.price,
-  nameEn: translations.en[pkg.nameKey],
-  nameMm: translations.mm[pkg.nameKey],
-  descriptionEn: translations.en[pkg.descKey],
-  descriptionMm: translations.mm[pkg.descKey],
+  name: translations.en[pkg.nameKey],
+  description: translations.en[pkg.descKey],
 }));
 
-function localizedPackage(packageItem, language) {
-  return {
-    name: language === "mm" ? packageItem.nameMm : packageItem.nameEn,
-    description: language === "mm" ? packageItem.descriptionMm : packageItem.descriptionEn,
-  };
+function packageCopy(packageItem) {
+  return { name: packageItem.name, description: packageItem.description };
 }
 
 function formatPrice(value, language) {
@@ -98,10 +93,9 @@ function Logo({ compact = false }) {
 function App() {
   const [language, setLanguage] = useState(() => localStorage.getItem("emc-language") || "en");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mobilePage, setMobilePage] = useState("home");
+  const [mobilePage, setMobilePage] = useState("services");
   const [packages, setPackages] = useState(fallbackPackages);
   const [selectedPackage, setSelectedPackage] = useState(String(fallbackPackages[1]?.id || ""));
-  const [pickupFee, setPickupFee] = useState(0);
   const [handover, setHandover] = useState("dropoff");
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
@@ -163,8 +157,8 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([accountApi.packages(), accountApi.settings()])
-      .then(([packageData, settingsData]) => {
+    accountApi.packages()
+      .then((packageData) => {
         if (!active) return;
         if (Array.isArray(packageData.packages)) {
           setPackages(packageData.packages);
@@ -172,7 +166,6 @@ function App() {
             ? String(current)
             : packageData.packages.length ? String(packageData.packages[Math.min(1, packageData.packages.length - 1)].id) : "");
         }
-        setPickupFee(settingsData.pickupFeeKs || 0);
       })
       .catch(() => {});
     return () => { active = false; };
@@ -224,13 +217,21 @@ function App() {
   };
 
   const scrollTo = (id) => {
-    if (window.matchMedia("(max-width: 760px)").matches) {
-      const page = id === "order" ? "order" : id === "process" ? "process" : id === "top" ? "home" : "services";
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      const page = id === "order" ? "order" : "services";
       openMobilePage(page, id === "packages" ? "packages" : null);
       return;
     }
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setMenuOpen(false);
+  };
+
+  const openCustomerAccount = (mode) => {
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      openMobilePage("account");
+      return;
+    }
+    setAccountMode(mode);
   };
 
   const choosePackage = (id) => {
@@ -316,7 +317,7 @@ function App() {
     event.preventDefault();
     if (!customer) {
       setFormError(t.signInToOrder);
-      setAccountMode("login");
+      openCustomerAccount("login");
       return;
     }
     if (!orderContact.name || !orderContact.phone || !orderContact.address || !selectedPackage || photos.length === 0) {
@@ -380,7 +381,7 @@ function App() {
       setFormError(messages[error?.code] || (navigator.onLine ? t.orderSubmitError : t.draftSavedOffline));
       if (error?.status === 401) {
         setCustomer(null);
-        setAccountMode("login");
+        openCustomerAccount("login");
       }
     } finally {
       setSubmitting(false);
@@ -388,7 +389,7 @@ function App() {
   };
 
   const heroPackage = packages[Math.min(1, packages.length - 1)];
-  const heroPackageCopy = heroPackage ? localizedPackage(heroPackage, language) : null;
+  const heroPackageCopy = heroPackage ? packageCopy(heroPackage) : null;
 
   return (
     <div className={language === "mm" ? "app myanmar" : "app"}>
@@ -405,13 +406,13 @@ function App() {
             <button className="language-button" onClick={() => setLanguage(language === "en" ? "mm" : "en")}>
               <Languages size={17} /><span>{t.languageName}</span>
             </button>
-            <button className="install-button" onClick={handleInstall}><Upload size={16} /><span>{t.install}</span></button>
+            {!installed && <button className="install-button" onClick={handleInstall}><Upload size={16} /><span>{t.install}</span></button>}
             {customer ? (
-              <button className="account-button signed-in" onClick={() => setAccountMode("profile")}>
+              <button className="account-button signed-in" onClick={() => openCustomerAccount("profile")}>
                 <span><UserRound size={16} />{unreadCount > 0 && <i className="account-unread" aria-label={`${unreadCount} ${t.newUpdates}`}>{unreadCount > 9 ? "9+" : unreadCount}</i>}</span><strong>{customer.fullName.split(" ")[0]}</strong>
               </button>
             ) : (
-              <button className="account-button" onClick={() => setAccountMode("login")}><UserRound size={16} /><strong>{t.signIn}</strong></button>
+              <button className="account-button" onClick={() => openCustomerAccount("login")}><UserRound size={16} /><strong>{t.signIn}</strong></button>
             )}
             <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label={t.toggleMenu}>
               {menuOpen ? <X /> : <Menu />}
@@ -497,7 +498,7 @@ function App() {
             <div className="packages-grid">
               {packages.length === 0 && <p className="packages-empty">{t.noPackagesAvailable}</p>}
               {packages.map((pkg, index) => {
-                const localized = localizedPackage(pkg, language);
+                const localized = packageCopy(pkg);
                 const isSelected = String(selectedPackage) === String(pkg.id);
                 const featured = index === Math.min(1, packages.length - 1);
                 return (
@@ -569,7 +570,7 @@ function App() {
                     <label className="field full"><span>{t.packageLabel} <small>{t.required}</small></span>
                       <select value={selectedPackage} onChange={(event) => setSelectedPackage(event.target.value)}>
                         <option value="">{t.choosePackagePlaceholder}</option>
-                        {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{localizedPackage(pkg, language).name} — {formatPrice(pkg.priceKs, language)} {t.ks}</option>)}
+                        {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{packageCopy(pkg).name} — {formatPrice(pkg.priceKs, language)} {t.ks}</option>)}
                       </select>
                     </label>
                   </div>
@@ -582,7 +583,7 @@ function App() {
                     </label>
                     <label className={handover === "pickup" ? "choice-card checked" : "choice-card"}>
                       <input type="radio" name="handover" value="pickup" checked={handover === "pickup"} onChange={() => setHandover("pickup")} />
-                      <span className="choice-icon"><Truck /></span><span><strong>{t.pickup}</strong><small>{pickupFee > 0 ? `${t.pickupFeeLabel}: ${formatPrice(pickupFee, language)} ${t.ks}` : t.pickupBody}</small></span><i><Check /></i>
+                      <span className="choice-icon"><Truck /></span><span><strong>{t.pickup}</strong><small>{t.pickupBody}</small></span><i><Check /></i>
                     </label>
                   </div>
                   <label className="field notes-field"><span>{t.notes}</span><textarea name="notes" rows="3" value={orderNotes} onChange={(event) => setOrderNotes(event.target.value)} placeholder={t.notesPlaceholder} /></label>
@@ -617,6 +618,34 @@ function App() {
             </div>
           </div>
         </section>
+        <section className={`mobile-page mobile-page-activity ${mobilePage === "activity" ? "mobile-active" : ""}`}>
+          <AccountModal
+            mode={customer ? "profile" : "login"}
+            customer={customer}
+            t={t}
+            embedded
+            mobileSection="activity"
+            onClose={() => openMobilePage("services")}
+            onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
+            onProfileUpdate={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
+            onLogout={() => { setCustomer(null); setUnreadCount(0); setOrderContact({ name: "", phone: "", address: "" }); }}
+            onUnreadChange={setUnreadCount}
+          />
+        </section>
+        <section className={`mobile-page mobile-page-account ${mobilePage === "account" ? "mobile-active" : ""}`}>
+          <AccountModal
+            mode={customer ? "profile" : "login"}
+            customer={customer}
+            t={t}
+            embedded
+            mobileSection="account"
+            onClose={() => openMobilePage("services")}
+            onAuthenticated={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
+            onProfileUpdate={(nextCustomer) => { setCustomer(nextCustomer); setOrderContact({ name: nextCustomer.fullName, phone: nextCustomer.phone, address: nextCustomer.address || "" }); }}
+            onLogout={() => { setCustomer(null); setUnreadCount(0); setOrderContact({ name: "", phone: "", address: "" }); }}
+            onUnreadChange={setUnreadCount}
+          />
+        </section>
       </main>
 
       <footer>
@@ -627,17 +656,17 @@ function App() {
         </div>
       </footer>
       <nav className="mobile-tabbar" aria-label={t.mainNavigation}>
-        <button type="button" className={mobilePage === "home" ? "active" : ""} onClick={() => openMobilePage("home")} aria-current={mobilePage === "home" ? "page" : undefined}>
-          <House /><span>{t.navHome}</span>
-        </button>
         <button type="button" className={mobilePage === "services" ? "active" : ""} onClick={() => openMobilePage("services")} aria-current={mobilePage === "services" ? "page" : undefined}>
           <PackageCheck /><span>{t.navServices}</span>
         </button>
-        <button type="button" className={mobilePage === "process" ? "active" : ""} onClick={() => openMobilePage("process")} aria-label={t.navProcess} aria-current={mobilePage === "process" ? "page" : undefined}>
-          <Clock3 /><span>{t.navProcessShort}</span>
-        </button>
         <button type="button" className={mobilePage === "order" ? "active" : ""} onClick={() => openMobilePage("order")} aria-label={t.navOrder} aria-current={mobilePage === "order" ? "page" : undefined}>
           <ClipboardList /><span>{t.navOrderShort}</span>
+        </button>
+        <button type="button" className={mobilePage === "activity" ? "active" : ""} onClick={() => openMobilePage("activity")} aria-current={mobilePage === "activity" ? "page" : undefined}>
+          <span className="mobile-tab-icon"><History />{unreadCount > 0 && <i>{unreadCount > 9 ? "9+" : unreadCount}</i>}</span><span>{t.navActivity}</span>
+        </button>
+        <button type="button" className={mobilePage === "account" ? "active" : ""} onClick={() => openMobilePage("account")} aria-current={mobilePage === "account" ? "page" : undefined}>
+          <UserRound /><span>{t.account}</span>
         </button>
       </nav>
       {accountMode && (

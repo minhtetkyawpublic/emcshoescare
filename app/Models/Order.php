@@ -12,7 +12,7 @@ class Order extends Model
 
     protected function casts(): array
     {
-        return ['package_price_ks' => 'integer', 'pickup_fee_ks' => 'integer', 'total_price_ks' => 'integer', 'customer_seen_at' => 'datetime'];
+        return ['package_price_ks' => 'integer', 'total_price_ks' => 'integer', 'customer_seen_at' => 'datetime'];
     }
 
     public function customer(): BelongsTo
