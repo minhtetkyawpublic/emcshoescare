@@ -43,9 +43,12 @@ is not required on Hostinger after pulling a release.
 
 ## URLs
 
-- App: `https://k2softwarestudio.com/emcshoescare/`
-- Admin: `https://k2softwarestudio.com/emcshoescare/admin`
+- App: `https://k2softwarestudio.com/emcshoescare/customer/home`
+- Admin: `https://k2softwarestudio.com/emcshoescare/admin/orders`
 - Health: `https://k2softwarestudio.com/emcshoescare/api/health`
+
+The shorter `/emcshoescare/` and `/emcshoescare/admin` URLs redirect to the
+correct scoped PWA entry points.
 
 Verify private material is blocked:
 

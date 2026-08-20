@@ -1,7 +1,8 @@
 const CACHE_PREFIX = "emc-";
-const CACHE_NAME = "emc-static-v8";
+const CACHE_NAME = "emc-static-v9";
 const APP_SHELL = [
-  "./",
+  "./customer/home",
+  "./admin/orders",
   "./offline.html",
   "./offline.css",
   "./manifest.webmanifest",
@@ -29,15 +30,19 @@ self.addEventListener("push", (event) => {
     icon: "./icon-192.png",
     badge: "./icon-192.png",
     tag: data.tag || "emc-update",
-    data: { url: data.url || "./" },
+    data: { url: data.url || "./customer/home" },
   }));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || "./", self.registration.scope).href;
+  const targetUrl = new URL(event.notification.data?.url || "./customer/home", self.registration.scope).href;
   event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
-    const existing = clients.find((client) => client.url.startsWith(self.registration.scope));
+    const targetIsAdmin = /\/admin(?:\/|$)/.test(new URL(targetUrl).pathname);
+    const existing = clients.find((client) => {
+      const clientIsAdmin = /\/admin(?:\/|$)/.test(new URL(client.url).pathname);
+      return client.url.startsWith(self.registration.scope) && clientIsAdmin === targetIsAdmin;
+    });
     if (existing) {
       await existing.navigate(targetUrl);
       return existing.focus();
@@ -64,7 +69,9 @@ async function networkFirst(request) {
     }
     return response;
   } catch {
-    return (await caches.match(request)) || (await caches.match("./")) || caches.match("./offline.html");
+    const requestUrl = new URL(request.url);
+    const appFallback = /\/admin(?:\/|$)/.test(requestUrl.pathname) ? "./admin/orders" : "./customer/home";
+    return (await caches.match(request)) || (await caches.match(appFallback)) || caches.match("./offline.html");
   }
 }
 

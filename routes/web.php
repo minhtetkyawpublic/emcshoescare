@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\PushSubscriptionController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->middleware('api.headers')->group(function () {
@@ -43,6 +44,26 @@ Route::prefix('api')->middleware('api.headers')->group(function () {
     Route::get('/admin/reports', [AdminReportController::class, 'show']);
     Route::get('/admin/orders/{order}', [AdminOrderController::class, 'show'])->whereNumber('order');
     Route::put('/admin/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->whereNumber('order')->middleware('trusted.browser');
+});
+
+// Keep the public landing URL inside the customer PWA's dedicated scope.
+// getBaseUrl() makes the redirect work when this project is deployed in a subfolder.
+Route::get('/', function (Request $request) {
+    $base = rtrim($request->getBaseUrl(), '/');
+
+    return response('', 302)->header('Location', "{$base}/customer/home");
+});
+
+Route::get('/customer', function (Request $request) {
+    $base = rtrim($request->getBaseUrl(), '/');
+
+    return response('', 302)->header('Location', "{$base}/customer/home");
+});
+
+Route::get('/admin', function (Request $request) {
+    $base = rtrim($request->getBaseUrl(), '/');
+
+    return response('', 302)->header('Location', "{$base}/admin/orders");
 });
 
 Route::view('/{path?}', 'app')

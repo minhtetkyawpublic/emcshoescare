@@ -124,7 +124,7 @@ class AdminOrderController extends ApiController
         $notification = $push->notifyCustomer($updated->customer_id, [
             'title' => 'Order status updated',
             'body' => "{$updated->order_number}: {$statusLabel}",
-            'url' => './',
+            'url' => './customer/home',
             'tag' => "customer-order-{$updated->id}",
         ]);
 

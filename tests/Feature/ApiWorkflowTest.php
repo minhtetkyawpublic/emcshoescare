@@ -120,13 +120,29 @@ class ApiWorkflowTest extends TestCase
 
     public function test_laravel_serves_the_react_spa_and_keeps_unknown_api_routes_json(): void
     {
-        $this->get('/')->assertOk()->assertSee('<div id="root"></div>', false)->assertSee('/build/assets/', false);
-        $this->get('/admin')->assertOk()->assertSee('<div id="root"></div>', false);
+        $this->get('/')->assertRedirect('/customer/home');
+        $this->get('/customer')->assertRedirect('/customer/home');
+        $this->get('/customer/home')->assertOk()->assertSee('<div id="root"></div>', false)->assertSee('/build/assets/', false)->assertSee('manifest.webmanifest?v=3', false);
+        $this->get('/admin')->assertRedirect('/admin/orders');
         $this->get('/admin/orders')->assertOk()->assertSee('<div id="root"></div>', false);
         $this->get('/admin/packages')->assertOk()->assertSee('<div id="root"></div>', false);
         $this->get('/admin/reports')->assertOk()->assertSee('<div id="root"></div>', false);
         $this->getJson('/api/settings')->assertNotFound()->assertJsonPath('error.code', 'not_found');
         $this->getJson('/api/admin/settings')->assertNotFound()->assertJsonPath('error.code', 'not_found');
         $this->getJson('/api/not-a-route')->assertNotFound()->assertJsonPath('error.code', 'not_found');
+    }
+
+    public function test_customer_and_admin_pwa_scopes_do_not_overlap(): void
+    {
+        $customer = json_decode(file_get_contents(public_path('manifest.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
+        $admin = json_decode(file_get_contents(public_path('manifest-admin.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame('./customer/', $customer['id']);
+        $this->assertSame('./customer/home', $customer['start_url']);
+        $this->assertSame('./customer/', $customer['scope']);
+        $this->assertSame('./admin/', $admin['id']);
+        $this->assertSame('./admin/orders', $admin['start_url']);
+        $this->assertSame('./admin/', $admin['scope']);
+        $this->assertNotSame($customer['id'], $admin['id']);
     }
 }

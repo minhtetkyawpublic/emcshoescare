@@ -14,7 +14,7 @@
     <meta name="description" content="Book trusted shoe cleaning and repair with EMC Shoes Care Myanmar." />
     <link rel="icon" type="image/jpeg" href="{{ rtrim(request()->getBaseUrl(), '/') }}/emcicon.jpg" />
     <link rel="apple-touch-icon" sizes="180x180" href="{{ rtrim(request()->getBaseUrl(), '/') }}/apple-touch-icon-v2.png" />
-    <link rel="manifest" href="{{ rtrim(request()->getBaseUrl(), '/') }}/{{ $isAdminApp ? 'manifest-admin.webmanifest?v=2' : 'manifest.webmanifest?v=2' }}" />
+    <link rel="manifest" href="{{ rtrim(request()->getBaseUrl(), '/') }}/{{ $isAdminApp ? 'manifest-admin.webmanifest?v=3' : 'manifest.webmanifest?v=3' }}" />
     <title>{{ $isAdminApp ? 'EMC Shoes Care Admin' : 'EMC Shoes Care Myanmar' }}</title>
     @viteReactRefresh
     @vite('resources/js/main.jsx')

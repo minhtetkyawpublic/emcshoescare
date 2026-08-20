@@ -42,13 +42,15 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'React API/PWA URLs are not portable across deployment directories.' }
 
   $manifest = Get-Content public\manifest.webmanifest -Raw | ConvertFrom-Json
-  if ($manifest.short_name -ne 'EMC' -or $manifest.display -ne 'standalone' -or $manifest.start_url -ne './') { throw 'PWA manifest identity is invalid.' }
+  $adminManifest = Get-Content public\manifest-admin.webmanifest -Raw | ConvertFrom-Json
+  if ($manifest.short_name -ne 'EMC' -or $manifest.display -ne 'standalone' -or $manifest.id -ne './customer/' -or $manifest.start_url -ne './customer/home' -or $manifest.scope -ne './customer/') { throw 'Customer PWA manifest identity is invalid.' }
+  if ($adminManifest.short_name -ne 'EMC Admin' -or $adminManifest.display -ne 'standalone' -or $adminManifest.id -ne './admin/' -or $adminManifest.start_url -ne './admin/orders' -or $adminManifest.scope -ne './admin/') { throw 'Admin PWA manifest identity is invalid.' }
   Add-Type -AssemblyName System.Drawing
   $expectedIcons = @{
-    'public\icon-192.png' = 192
-    'public\icon-512.png' = 512
-    'public\maskable-512.png' = 512
-    'public\apple-touch-icon.png' = 180
+    'public\emc-pwa-v2-192.png' = 192
+    'public\emc-pwa-v2-512.png' = 512
+    'public\emc-pwa-v2-maskable-512.png' = 512
+    'public\apple-touch-icon-v2.png' = 180
   }
   foreach ($entry in $expectedIcons.GetEnumerator()) {
     $image = [System.Drawing.Image]::FromFile((Join-Path $projectRoot $entry.Key))
