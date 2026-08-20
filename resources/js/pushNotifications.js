@@ -15,6 +15,16 @@ export async function pushState() {
   return (await registration.pushManager.getSubscription()) ? "enabled" : "disabled";
 }
 
+export async function syncPush(saveSubscription) {
+  const state = await pushState();
+  if (state !== "enabled") return state;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return "disabled";
+  await saveSubscription({ ...subscription.toJSON(), contentEncoding: "aes128gcm" });
+  return "enabled";
+}
+
 export async function enablePush(publicKey, saveSubscription) {
   if (!pushSupported()) throw new Error("push_unsupported");
   const permission = await Notification.requestPermission();

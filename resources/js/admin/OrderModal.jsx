@@ -10,8 +10,7 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
   const packageName = order.package.name;
   const dialogRef = useRef(null);
   const [nextStatus, setNextStatus] = useState(order.nextStatuses[0] || "");
-  const [noteEn, setNoteEn] = useState("");
-  const [noteMm, setNoteMm] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [activePhotoIndex, setActivePhotoIndex] = useState(null);
@@ -26,12 +25,11 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
     setBusy(true);
     setMessage("");
     try {
-      const data = await adminApi.updateOrderStatus(order.id, { status: nextStatus, noteEn, noteMm });
+      const data = await adminApi.updateOrderStatus(order.id, { status: nextStatus, note });
       setNextStatus(data.order.nextStatuses[0] || "");
-      setNoteEn("");
-      setNoteMm("");
+      setNote("");
       setBusy(false);
-      onUpdated(data.order);
+      onUpdated(data.order, data.notification);
     } catch (error) {
       setMessage(error?.code === "invalid_status_transition" ? t.invalidStatusTransition : t.adminUnavailable);
       setBusy(false);
@@ -61,9 +59,8 @@ function OrderModal({ order, language, t, onClose, onUpdated }) {
           <form className="admin-status-form" onSubmit={updateStatus}>
             <span className="admin-section-kicker">{t.updateStatus}</span>
             <label><span>{t.nextStatus}</span><select value={nextStatus} onChange={(event) => setNextStatus(event.target.value)}>{order.nextStatuses.map((status) => <option key={status} value={status}>{statusLabel(status, t)}</option>)}</select></label>
-            <label><span>{t.noteEnglish}</span><textarea rows="2" value={noteEn} onChange={(event) => setNoteEn(event.target.value)} placeholder={t.noteEnglishPlaceholder} maxLength="1000" /></label>
-            <label><span>{t.noteMyanmar}</span><textarea rows="2" value={noteMm} onChange={(event) => setNoteMm(event.target.value)} placeholder={t.noteMyanmarPlaceholder} maxLength="1500" /></label>
-            <p>{t.noteLanguageHint}</p>
+            <label><span>{t.customerNoteOptional}</span><textarea rows="3" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t.customerNotePlaceholder} maxLength="1500" /></label>
+            <p>{t.customerNoteHint}</p>
             {message && <p className="admin-error" role="alert">{message}</p>}
             <button className="admin-primary" disabled={busy}>{busy ? t.saving : t.updateStatus}<ArrowRight /></button>
           </form>

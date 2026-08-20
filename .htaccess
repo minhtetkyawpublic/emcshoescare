@@ -9,7 +9,7 @@ AddType application/manifest+json .webmanifest
   RewriteRule ^public(?:/|$) - [L,NC]
 
   RewriteRule ^build(/.*)?$ public/$0 [L,NC]
-  RewriteRule ^(manifest\.webmanifest|sw\.js|offline\.html|offline\.css|apple-touch-icon\.png|icon-192\.png|icon-512\.png|maskable-512\.png|emcicon\.jpg)$ public/$1 [L,NC]
+  RewriteRule ^(manifest\.webmanifest|manifest-admin\.webmanifest|sw\.js|offline\.html|offline\.css|apple-touch-icon\.png|apple-touch-icon-v2\.png|icon-192\.png|icon-512\.png|maskable-512\.png|emc-pwa-v2-192\.png|emc-pwa-v2-512\.png|emc-pwa-v2-maskable-512\.png|emcicon\.jpg)$ public/$1 [L,NC]
 
   RewriteRule ^ index.php [L]
 </IfModule>

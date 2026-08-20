@@ -1,15 +1,15 @@
 const CACHE_PREFIX = "emc-";
-const CACHE_NAME = "emc-static-v7";
+const CACHE_NAME = "emc-static-v8";
 const APP_SHELL = [
   "./",
   "./offline.html",
   "./offline.css",
   "./manifest.webmanifest",
   "./manifest-admin.webmanifest",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./maskable-512.png",
-  "./apple-touch-icon.png",
+  "./emc-pwa-v2-192.png",
+  "./emc-pwa-v2-512.png",
+  "./emc-pwa-v2-maskable-512.png",
+  "./apple-touch-icon-v2.png",
   "./emcicon.jpg",
 ];
 

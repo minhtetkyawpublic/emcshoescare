@@ -103,12 +103,11 @@ class AdminOrderController extends ApiController
     {
         $admin = $this->admin();
         $status = trim((string) $request->input('status', ''));
-        $noteEn = trim((string) $request->input('noteEn', ''));
-        $noteMm = trim((string) $request->input('noteMm', ''));
-        if (mb_strlen($noteEn) > 1000 || mb_strlen($noteMm) > 1500) {
+        $note = trim((string) $request->input('note', $request->input('noteEn', $request->input('noteMm', ''))));
+        if (mb_strlen($note) > 1500) {
             throw new ApiException('validation_failed', 'The customer note is too long.', 422);
         }
-        DB::transaction(function () use ($order, $status, $noteEn, $noteMm, $admin) {
+        DB::transaction(function () use ($order, $status, $note, $admin) {
             $record = Order::whereKey($order)->lockForUpdate()->first();
             if (! $record) {
                 throw new ApiException('order_not_found', 'Order not found.', 404);
@@ -118,17 +117,17 @@ class AdminOrderController extends ApiController
             }
             $previous = $record->status;
             $record->update(['status' => $status, 'customer_seen_at' => null]);
-            OrderStatusHistory::create(['order_id' => $record->id, 'from_status' => $previous, 'to_status' => $status, 'note_en' => $noteEn, 'note_mm' => $noteMm, 'changed_by_admin_id' => $admin->id, 'created_at' => now()]);
+            OrderStatusHistory::create(['order_id' => $record->id, 'from_status' => $previous, 'to_status' => $status, 'note_en' => $note, 'note_mm' => '', 'changed_by_admin_id' => $admin->id, 'created_at' => now()]);
         });
         $updated = Order::findOrFail($order);
         $statusLabel = str($updated->status)->replace('_', ' ')->title();
-        $push->notifyCustomer($updated->customer_id, [
+        $notification = $push->notifyCustomer($updated->customer_id, [
             'title' => 'Order status updated',
             'body' => "{$updated->order_number}: {$statusLabel}",
             'url' => './',
             'tag' => "customer-order-{$updated->id}",
         ]);
 
-        return $this->success(['order' => OrderPresenter::make(OrderPresenter::loadDetailed($updated), true), 'csrfToken' => $this->csrf()]);
+        return $this->success(['order' => OrderPresenter::make(OrderPresenter::loadDetailed($updated), true), 'notification' => $notification, 'csrfToken' => $this->csrf()]);
     }
 }

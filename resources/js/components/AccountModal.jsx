@@ -4,7 +4,7 @@ import { accountApi, apiUrl } from "../api/client";
 import { localizedStatusNote, statusLabel } from "../orderStatus";
 import useDialogFocus from "./useDialogFocus";
 import { appBaseFromModuleUrl } from "../api/baseUrl";
-import { disablePush, enablePush, pushState } from "../pushNotifications";
+import { disablePush, enablePush, syncPush } from "../pushNotifications";
 
 const emcIcon = `${appBaseFromModuleUrl(import.meta.url)}/emcicon.jpg`;
 
@@ -80,7 +80,7 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
 
   useEffect(() => {
     if (!customer) return;
-    pushState().then(setNotificationState).catch(() => setNotificationState("unsupported"));
+    syncPush((subscription) => accountApi.savePushSubscription(subscription)).then(setNotificationState).catch(() => setNotificationState("disabled"));
   }, [customer]);
 
   const toggleNotifications = async () => {

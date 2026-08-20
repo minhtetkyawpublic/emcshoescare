@@ -22,20 +22,22 @@ class WebPushService
         return (string) config('emc.web_push.public_key');
     }
 
-    public function notifyCustomer(int $customerId, array $payload): void
+    public function notifyCustomer(int $customerId, array $payload): array
     {
-        $this->send(PushSubscriptionModel::where('customer_id', $customerId)->get(), $payload);
+        return $this->send(PushSubscriptionModel::where('customer_id', $customerId)->get(), $payload);
     }
 
-    public function notifyAdmins(array $payload): void
+    public function notifyAdmins(array $payload): array
     {
-        $this->send(PushSubscriptionModel::whereIn('admin_id', Admin::where('is_active', true)->select('id'))->get(), $payload);
+        return $this->send(PushSubscriptionModel::whereIn('admin_id', Admin::where('is_active', true)->select('id'))->get(), $payload);
     }
 
-    private function send(iterable $subscriptions, array $payload): void
+    private function send(iterable $subscriptions, array $payload): array
     {
+        $records = collect($subscriptions);
+        $summary = ['configured' => $this->configured(), 'subscriptions' => $records->count(), 'delivered' => 0, 'failed' => 0];
         if (! $this->configured()) {
-            return;
+            return $summary;
         }
 
         try {
@@ -46,7 +48,7 @@ class WebPushService
             ]], [], 5);
             $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-            foreach ($subscriptions as $record) {
+            foreach ($records as $record) {
                 $webPush->queueNotification(Subscription::create([
                     'endpoint' => $record->endpoint,
                     'publicKey' => $record->public_key,
@@ -59,14 +61,20 @@ class WebPushService
                 $hash = hash('sha256', (string) $report->getRequest()->getUri());
                 if ($report->isSubscriptionExpired()) {
                     PushSubscriptionModel::where('endpoint_hash', $hash)->delete();
+                    $summary['failed']++;
                 } elseif ($report->isSuccess()) {
                     PushSubscriptionModel::where('endpoint_hash', $hash)->update(['last_used_at' => now()]);
+                    $summary['delivered']++;
                 } else {
+                    $summary['failed']++;
                     Log::warning('Web Push delivery failed.', ['reason' => $report->getReason()]);
                 }
             }
         } catch (\Throwable $exception) {
+            $summary['failed'] = $summary['subscriptions'];
             Log::warning('Web Push could not be sent.', ['exception' => $exception->getMessage()]);
         }
+
+        return $summary;
     }
 }

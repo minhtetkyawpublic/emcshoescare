@@ -9,7 +9,7 @@ import ReportsPanel from "./admin/ReportsPanel";
 import AdminLogo from "./admin/AdminLogo";
 import { adminPrice } from "./admin/utils";
 import { translations } from "./i18n/translations";
-import { disablePush, enablePush, pushState } from "./pushNotifications";
+import { disablePush, enablePush, syncPush } from "./pushNotifications";
 
 const INITIAL_FILTERS = { search: "", status: "", packageId: "", handover: "", from: "", to: "", perPage: 25, page: 1 };
 const EMPTY_PAGINATION = { currentPage: 1, lastPage: 1, perPage: 25, total: 0, from: null, to: null };
@@ -88,7 +88,7 @@ function AdminApp() {
 
   useEffect(() => {
     if (!admin) return;
-    pushState().then(setNotificationState).catch(() => setNotificationState("unsupported"));
+    syncPush((subscription) => adminApi.savePushSubscription(subscription)).then(setNotificationState).catch(() => setNotificationState("disabled"));
   }, [admin]);
 
   useEffect(() => {
@@ -176,10 +176,10 @@ function AdminApp() {
     }
   };
 
-  const orderUpdated = (updatedOrder) => {
+  const orderUpdated = (updatedOrder, notification) => {
     setSelectedOrder(updatedOrder);
     loadOrders(filters);
-    setNotice(t.statusUpdated);
+    setNotice(notification?.subscriptions === 0 ? t.customerNotificationsNotEnabled : notification?.failed > 0 ? t.notificationDeliveryFailed : t.statusUpdated);
   };
 
   const packageSaved = async () => {
