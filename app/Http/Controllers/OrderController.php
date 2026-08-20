@@ -8,6 +8,7 @@ use App\Models\OrderPhoto;
 use App\Models\OrderStatusHistory;
 use App\Models\ServicePackage;
 use App\Services\OrderPresenter;
+use App\Services\WebPushService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,7 @@ class OrderController extends ApiController
         return $this->success(['seen' => true, 'csrfToken' => $this->csrf()]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, WebPushService $push)
     {
         $customer = $this->customer();
         $requestId = strtolower(trim((string) $request->input('clientRequestId', '')));
@@ -163,6 +164,13 @@ class OrderController extends ApiController
             }
             throw $exception;
         }
+
+        $push->notifyAdmins([
+            'title' => 'New EMC order',
+            'body' => "{$order->order_number} from {$order->customer_name}",
+            'url' => './admin/orders',
+            'tag' => "admin-order-{$order->id}",
+        ]);
 
         return $this->success(['order' => OrderPresenter::make(OrderPresenter::loadDetailed($order), true), 'customer' => $this->customerPayload($customer), 'csrfToken' => $this->csrf()], 201);
     }

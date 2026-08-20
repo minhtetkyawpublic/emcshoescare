@@ -75,6 +75,15 @@ export const accountApi = {
   markOrderSeen(orderId) {
     return request(`/orders/${orderId}/seen`, { method: "POST" });
   },
+  pushConfiguration() {
+    return request("/push/public-key");
+  },
+  savePushSubscription(subscription) {
+    return request("/push/customer", { method: "POST", body: JSON.stringify(subscription) });
+  },
+  removePushSubscription(endpoint) {
+    return request("/push/customer", { method: "DELETE", body: JSON.stringify({ endpoint }) });
+  },
   async logout() {
     const data = await request("/auth/logout", { method: "POST" });
     csrfToken = "";

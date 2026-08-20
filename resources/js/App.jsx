@@ -117,6 +117,9 @@ function App() {
   const fileInput = useRef(null);
   const mainScroll = useRef(null);
   const t = translations[language];
+  const effectiveSelectedPackage = packages.some((pkg) => String(pkg.id) === String(selectedPackage))
+    ? String(selectedPackage)
+    : packages.length ? String(packages[Math.min(1, packages.length - 1)].id) : "";
 
   useEffect(() => {
     localStorage.setItem("emc-language", language);
@@ -320,7 +323,7 @@ function App() {
       openCustomerAccount("login");
       return;
     }
-    if (!orderContact.name || !orderContact.phone || !orderContact.address || !selectedPackage || photos.length === 0) {
+    if (!orderContact.name || !orderContact.phone || !orderContact.address || !effectiveSelectedPackage || photos.length === 0) {
       setFormError(t.requiredError);
       return;
     }
@@ -330,7 +333,7 @@ function App() {
     const payload = new FormData();
     payload.append("fullName", orderContact.name);
     payload.append("address", orderContact.address);
-    payload.append("packageId", selectedPackage);
+    payload.append("packageId", effectiveSelectedPackage);
     payload.append("handover", handover);
     payload.append("notes", orderNotes);
     payload.append("clientRequestId", clientRequestId);
@@ -341,7 +344,7 @@ function App() {
         await saveOrderDraft({
           customerId: customer.id,
           contact: orderContact,
-          packageId: selectedPackage,
+          packageId: effectiveSelectedPackage,
           handover,
           notes: orderNotes,
           clientRequestId,
@@ -499,7 +502,7 @@ function App() {
               {packages.length === 0 && <p className="packages-empty">{t.noPackagesAvailable}</p>}
               {packages.map((pkg, index) => {
                 const localized = packageCopy(pkg);
-                const isSelected = String(selectedPackage) === String(pkg.id);
+                const isSelected = effectiveSelectedPackage === String(pkg.id);
                 const featured = index === Math.min(1, packages.length - 1);
                 return (
                 <article className={`package-card ${featured ? "featured" : ""} ${isSelected ? "active" : ""}`} key={pkg.id}>
@@ -568,7 +571,7 @@ function App() {
                     <label className="field"><span>{t.phone} <small>{t.required}</small></span><input name="phone" type="tel" inputMode="tel" value={orderContact.phone} onChange={(event) => setOrderContact((current) => ({ ...current, phone: event.target.value }))} placeholder={t.phonePlaceholder} autoComplete="tel" readOnly={Boolean(customer)} /></label>
                     <label className="field full"><span>{t.address} <small>{t.required}</small></span><textarea name="address" rows="2" value={orderContact.address} onChange={(event) => setOrderContact((current) => ({ ...current, address: event.target.value }))} placeholder={t.addressPlaceholder} autoComplete="street-address" /></label>
                     <label className="field full"><span>{t.packageLabel} <small>{t.required}</small></span>
-                      <select value={selectedPackage} onChange={(event) => setSelectedPackage(event.target.value)}>
+                      <select value={effectiveSelectedPackage} onChange={(event) => setSelectedPackage(event.target.value)}>
                         <option value="">{t.choosePackagePlaceholder}</option>
                         {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{packageCopy(pkg).name} — {formatPrice(pkg.priceKs, language)} {t.ks}</option>)}
                       </select>

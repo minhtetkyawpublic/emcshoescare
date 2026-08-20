@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
 use App\Services\OrderPresenter;
+use App\Services\WebPushService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -98,7 +99,7 @@ class AdminOrderController extends ApiController
         return $this->success(['order' => OrderPresenter::make(OrderPresenter::loadDetailed($record), true)]);
     }
 
-    public function updateStatus(Request $request, int $order)
+    public function updateStatus(Request $request, int $order, WebPushService $push)
     {
         $admin = $this->admin();
         $status = trim((string) $request->input('status', ''));
@@ -120,6 +121,13 @@ class AdminOrderController extends ApiController
             OrderStatusHistory::create(['order_id' => $record->id, 'from_status' => $previous, 'to_status' => $status, 'note_en' => $noteEn, 'note_mm' => $noteMm, 'changed_by_admin_id' => $admin->id, 'created_at' => now()]);
         });
         $updated = Order::findOrFail($order);
+        $statusLabel = str($updated->status)->replace('_', ' ')->title();
+        $push->notifyCustomer($updated->customer_id, [
+            'title' => 'Order status updated',
+            'body' => "{$updated->order_number}: {$statusLabel}",
+            'url' => './',
+            'tag' => "customer-order-{$updated->id}",
+        ]);
 
         return $this->success(['order' => OrderPresenter::make(OrderPresenter::loadDetailed($updated), true), 'csrfToken' => $this->csrf()]);
     }

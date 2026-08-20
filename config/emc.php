@@ -8,4 +8,9 @@ return [
     'upload_max_bytes' => (int) env('EMC_UPLOAD_MAX_BYTES', 5 * 1024 * 1024),
     'order_photo_retention_days' => (int) env('EMC_ORDER_PHOTO_RETENTION_DAYS', 0),
     'admin_remember_days' => (int) env('EMC_ADMIN_REMEMBER_DAYS', 30),
+    'web_push' => [
+        'subject' => (string) env('VAPID_SUBJECT', ''),
+        'public_key' => (string) env('VAPID_PUBLIC_KEY', ''),
+        'private_key' => (string) env('VAPID_PRIVATE_KEY', ''),
+    ],
 ];

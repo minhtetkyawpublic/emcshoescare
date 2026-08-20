@@ -73,4 +73,13 @@ export const adminApi = {
   report(filters = {}) {
     return adminRequest(`/admin/reports${queryString(filters)}`);
   },
+  pushConfiguration() {
+    return adminRequest("/push/public-key");
+  },
+  savePushSubscription(subscription) {
+    return adminRequest("/push/admin", { method: "POST", body: JSON.stringify(subscription) });
+  },
+  removePushSubscription(endpoint) {
+    return adminRequest("/push/admin", { method: "DELETE", body: JSON.stringify({ endpoint }) });
+  },
 };

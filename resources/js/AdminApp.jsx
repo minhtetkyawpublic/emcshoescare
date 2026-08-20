@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Archive, BarChart3, Box, Check, ClipboardList, Languages, LogOut, Menu, PackagePlus, Pencil, RefreshCw, UserRound } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Archive, BarChart3, Bell, Box, Check, ClipboardList, Languages, LogOut, Menu, PackagePlus, Pencil, RefreshCw, UserRound } from "lucide-react";
 import { adminApi } from "./api/adminClient";
 import AdminLogin from "./admin/AdminLogin";
 import OrderModal from "./admin/OrderModal";
@@ -9,6 +9,7 @@ import ReportsPanel from "./admin/ReportsPanel";
 import AdminLogo from "./admin/AdminLogo";
 import { adminPrice } from "./admin/utils";
 import { translations } from "./i18n/translations";
+import { disablePush, enablePush, pushState } from "./pushNotifications";
 
 const INITIAL_FILTERS = { search: "", status: "", packageId: "", handover: "", from: "", to: "", perPage: 25, page: 1 };
 const EMPTY_PAGINATION = { currentPage: 1, lastPage: 1, perPage: 25, total: 0, from: null, to: null };
@@ -34,6 +35,9 @@ function AdminApp() {
   const [packageModal, setPackageModal] = useState(undefined);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [reportRefreshKey, setReportRefreshKey] = useState(0);
+  const [notificationState, setNotificationState] = useState("checking");
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const latestOrderId = useRef(null);
   const t = translations[language];
 
   useEffect(() => {
@@ -41,17 +45,17 @@ function AdminApp() {
     document.documentElement.lang = language === "mm" ? "my" : "en";
   }, [language]);
 
-  const loadOrders = useCallback(async (nextFilters = INITIAL_FILTERS) => {
-    setLoading(true);
-    setError("");
+  const loadOrders = useCallback(async (nextFilters = INITIAL_FILTERS, silent = false) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError("");
     try {
       const orderData = await adminApi.orders(nextFilters);
       setOrders(orderData.orders || []);
       setPagination(orderData.pagination || EMPTY_PAGINATION);
     } catch {
-      setError(t.adminUnavailable);
+      if (!silent) setError(t.adminUnavailable);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [t.adminUnavailable]);
 
@@ -83,6 +87,39 @@ function AdminApp() {
   }, [loadDashboard]);
 
   useEffect(() => {
+    if (!admin) return;
+    pushState().then(setNotificationState).catch(() => setNotificationState("unsupported"));
+  }, [admin]);
+
+  useEffect(() => {
+    if (!admin) return;
+    let active = true;
+    const checkNewOrders = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const data = await adminApi.orders({ ...INITIAL_FILTERS, perPage: 10 });
+        const nextId = data.orders?.[0]?.id || null;
+        if (active && latestOrderId.current && nextId && nextId !== latestOrderId.current) {
+          setNotice(t.newOrderReceived);
+          loadOrders(filters, true);
+        }
+        latestOrderId.current = nextId;
+      } catch { /* The normal refresh control remains available if a poll fails. */ }
+    };
+    const handleVisibility = () => { if (document.visibilityState === "visible") checkNewOrders(); };
+    checkNewOrders();
+    const interval = window.setInterval(checkNewOrders, 15000);
+    window.addEventListener("focus", checkNewOrders);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", checkNewOrders);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [admin, filters, loadOrders, t.newOrderReceived]);
+
+  useEffect(() => {
     const handlePopState = () => setTab(tabFromPath());
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -107,6 +144,26 @@ function AdminApp() {
 
   const logout = async () => {
     try { await adminApi.logout(); } finally { setAdmin(null); }
+  };
+
+  const toggleNotifications = async () => {
+    setNotificationBusy(true);
+    setError("");
+    try {
+      if (notificationState === "enabled") {
+        setNotificationState(await disablePush((endpoint) => adminApi.removePushSubscription(endpoint)));
+      } else {
+        const configuration = await adminApi.pushConfiguration();
+        if (!configuration.enabled) throw new Error("push_unsupported");
+        setNotificationState(await enablePush(configuration.publicKey, (subscription) => adminApi.savePushSubscription(subscription)));
+      }
+    } catch (exception) {
+      const nextState = exception?.message === "push_denied" ? "denied" : "unsupported";
+      setNotificationState(nextState);
+      setError(nextState === "denied" ? t.notificationDenied : t.notificationUnavailable);
+    } finally {
+      setNotificationBusy(false);
+    }
   };
 
   const openOrder = async (id) => {
@@ -160,7 +217,7 @@ function AdminApp() {
       </aside>
       {menuOpen && <button className="admin-sidebar-shade" onClick={() => setMenuOpen(false)} aria-label={t.close} />}
       <main className="admin-main">
-        <header className="admin-topbar"><button className="admin-menu" onClick={() => setMenuOpen(true)} aria-label={t.menu}><Menu /></button><div><span>{t.adminPortal}</span><strong>{t.dashboard}</strong></div><div><button onClick={() => setLanguage(language === "en" ? "mm" : "en")}><Languages />{t.languageName}</button><button onClick={refreshCurrent} disabled={loading} aria-label={t.refresh}><RefreshCw className={loading ? "spinning" : ""} /></button></div></header>
+        <header className="admin-topbar"><button className="admin-menu" onClick={() => setMenuOpen(true)} aria-label={t.menu}><Menu /></button><div><span>{t.adminPortal}</span><strong>{t.dashboard}</strong></div><div><button className={`admin-notification-button ${notificationState === "enabled" ? "notifications-enabled" : ""}`} onClick={toggleNotifications} disabled={notificationBusy || notificationState === "checking" || notificationState === "unsupported" || notificationState === "denied"} aria-label={notificationState === "enabled" ? t.disableNotifications : t.enableNotifications} title={notificationState === "unsupported" ? t.notificationUnavailable : notificationState === "denied" ? t.notificationDenied : notificationState === "enabled" ? t.notificationEnabled : t.enableNotifications}><Bell /><span>{notificationState === "enabled" ? t.notificationEnabled : t.notifications}</span></button><button onClick={() => setLanguage(language === "en" ? "mm" : "en")}><Languages />{t.languageName}</button><button onClick={refreshCurrent} disabled={loading} aria-label={t.refresh}><RefreshCw className={loading ? "spinning" : ""} /></button></div></header>
         <div className="admin-content">
           <div className="admin-welcome"><div><p>{t.welcomeAdmin}, {admin.displayName}</p><h1>{tab === "orders" ? t.adminOrders : tab === "packages" ? t.adminPackages : t.adminReports}</h1></div>{tab === "packages" && <button className="admin-primary" onClick={() => setPackageModal(null)}><PackagePlus />{t.createPackage}</button>}</div>
           {error && <p className="admin-error page-message" role="alert">{error}</p>}

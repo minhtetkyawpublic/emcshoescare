@@ -4,6 +4,7 @@ import { accountApi, apiUrl } from "../api/client";
 import { localizedStatusNote, statusLabel } from "../orderStatus";
 import useDialogFocus from "./useDialogFocus";
 import { appBaseFromModuleUrl } from "../api/baseUrl";
+import { disablePush, enablePush, pushState } from "../pushNotifications";
 
 const emcIcon = `${appBaseFromModuleUrl(import.meta.url)}/emcicon.jpg`;
 
@@ -27,6 +28,8 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   const [ordersLoading, setOrdersLoading] = useState(Boolean(customer));
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [ordersError, setOrdersError] = useState("");
+  const [notificationState, setNotificationState] = useState("checking");
+  const [notificationBusy, setNotificationBusy] = useState(false);
   const modalRef = useRef(null);
 
   useDialogFocus(modalRef, onClose, busy, "[data-initial-focus]", !embedded);
@@ -43,17 +46,62 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
   useEffect(() => {
     if (!customer || (embedded && mobileSection !== "activity")) return;
     let active = true;
-    accountApi.orders()
-      .then((data) => {
+    const refreshOrders = async () => {
+      try {
+        const data = await accountApi.orders();
         if (!active) return;
         const nextOrders = data.orders || [];
         setOrders(nextOrders);
         onUnreadChange(nextOrders.filter((order) => order.unreadStatus).length);
-      })
-      .catch(() => { if (active) setOrdersError(t.ordersLoadError); })
-      .finally(() => { if (active) setOrdersLoading(false); });
-    return () => { active = false; };
-  }, [customer, embedded, mobileSection, onUnreadChange, t.ordersLoadError]);
+        if (selectedOrder?.id) {
+          const detail = await accountApi.order(selectedOrder.id);
+          if (active) setSelectedOrder(detail.order);
+          if (detail.order?.unreadStatus) await accountApi.markOrderSeen(selectedOrder.id);
+        }
+        if (active) setOrdersError("");
+      } catch {
+        if (active) setOrdersError(t.ordersLoadError);
+      } finally {
+        if (active) setOrdersLoading(false);
+      }
+    };
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") refreshOrders(); };
+    refreshOrders();
+    const interval = window.setInterval(refreshWhenVisible, 15000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [customer, embedded, mobileSection, onUnreadChange, selectedOrder?.id, t.ordersLoadError]);
+
+  useEffect(() => {
+    if (!customer) return;
+    pushState().then(setNotificationState).catch(() => setNotificationState("unsupported"));
+  }, [customer]);
+
+  const toggleNotifications = async () => {
+    setNotificationBusy(true);
+    setMessage("");
+    try {
+      if (notificationState === "enabled") {
+        setNotificationState(await disablePush((endpoint) => accountApi.removePushSubscription(endpoint)));
+      } else {
+        const configuration = await accountApi.pushConfiguration();
+        if (!configuration.enabled) throw new Error("push_unsupported");
+        setNotificationState(await enablePush(configuration.publicKey, (subscription) => accountApi.savePushSubscription(subscription)));
+      }
+    } catch (error) {
+      const state = error?.message === "push_denied" ? "denied" : "unsupported";
+      setNotificationState(state);
+      setMessage(state === "denied" ? t.notificationDenied : t.notificationUnavailable);
+    } finally {
+      setNotificationBusy(false);
+    }
+  };
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -177,6 +225,10 @@ function AccountModal({ mode: initialMode, customer, t, onClose, onAuthenticated
               {success && <p className="account-success" role="status"><Check size={16} />{success}</p>}
               <button className="primary-button account-submit" disabled={busy}>{busy ? t.savingProfile : t.saveProfile}<ArrowRight size={17} /></button>
             </form>
+            <button className="notification-toggle" type="button" onClick={toggleNotifications} disabled={notificationBusy || notificationState === "checking" || notificationState === "unsupported" || notificationState === "denied"}>
+              <Bell size={17} />
+              <span><strong>{notificationState === "enabled" ? t.notificationEnabled : t.enableNotifications}</strong><small>{notificationState === "enabled" ? t.disableNotifications : t.notifications}</small></span>
+            </button>
             </>}
             {mobileSection !== "account" && <>
             <div className="account-divider" />
